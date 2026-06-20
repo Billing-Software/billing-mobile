@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'providers/auth_provider.dart';
 import 'providers/billing_provider.dart';
 import 'providers/theme_provider.dart';
+import 'providers/bluetooth_printer_provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/billing_screen.dart';
@@ -20,6 +21,7 @@ void main() {
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => BillingProvider()),
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        ChangeNotifierProvider(create: (_) => BluetoothPrinterProvider()),
       ],
       child: const SmartBillApp(),
     ),

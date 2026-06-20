@@ -17,17 +17,17 @@ class ApiClient {
   Future<String> getBaseUrl() async {
     final prefs = await SharedPreferences.getInstance();
     String? saved = prefs.getString(keyBaseUrl);
+    
+    // Automatically migrate old default/localhost URLs to the new ngrok URL
+    if (saved != null && (saved.contains('localhost') || saved.contains('192.168.'))) {
+      saved = 'https://e071-2401-4900-882d-e15c-753e-6498-b2f2-c2f0.ngrok-free.app/api';
+      await prefs.setString(keyBaseUrl, saved);
+    }
+
     if (saved != null && saved.isNotEmpty) {
       return saved;
     }
-    // Fallback: default base URL based on platform
-    if (kIsWeb) {
-      return 'http://localhost:5208/api';
-    } else if (defaultTargetPlatform == TargetPlatform.android) {
-      return 'http://192.168.1.2:5208/api';
-    } else {
-      return 'http://localhost:5208/api'; // Desktop (Windows/macOS)
-    }
+    return 'https://e071-2401-4900-882d-e15c-753e-6498-b2f2-c2f0.ngrok-free.app/api';
   }
 
   Future<void> setBaseUrl(String url) async {

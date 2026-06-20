@@ -4,11 +4,14 @@ import 'package:intl/intl.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../providers/auth_provider.dart';
 import '../providers/billing_provider.dart';
+import '../providers/bluetooth_printer_provider.dart';
 import '../models/service.dart';
 import '../models/customer.dart';
+import '../models/bill.dart';
 import '../services/service_catalog_service.dart';
 import '../services/customer_service.dart';
 import '../services/branch_service.dart';
+import '../services/bluetooth_printer_service.dart';
 import '../widgets/sidebar_drawer.dart';
 import '../widgets/custom_text_field.dart';
 
@@ -19,8 +22,7 @@ class BillingScreen extends StatefulWidget {
   State<BillingScreen> createState() => _BillingScreenState();
 }
 
-class _BillingScreenState extends State<BillingScreen> with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _BillingScreenState extends State<BillingScreen> {
 
   final ServiceCatalogService _serviceService = ServiceCatalogService();
   final CustomerService _customerService = CustomerService();
@@ -45,7 +47,6 @@ class _BillingScreenState extends State<BillingScreen> with SingleTickerProvider
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
     _fetchInitialData();
   }
 
@@ -111,7 +112,6 @@ class _BillingScreenState extends State<BillingScreen> with SingleTickerProvider
 
   @override
   void dispose() {
-    _tabController.dispose();
     _newCustNameController.dispose();
     _newCustPhoneController.dispose();
     _promoController.dispose();
@@ -240,44 +240,6 @@ class _BillingScreenState extends State<BillingScreen> with SingleTickerProvider
           'Billing POS',
           style: GoogleFonts.outfit(fontWeight: FontWeight.w900),
         ),
-        bottom: MediaQuery.of(context).size.width > 900
-            ? null
-            : TabBar(
-                controller: _tabController,
-                labelColor: const Color(0xFF006A61),
-                unselectedLabelColor: const Color(0xFF7C839B),
-                indicatorColor: const Color(0xFF006A61),
-                tabs: [
-                  const Tab(icon: Icon(Icons.grid_view), text: 'Services'),
-                  Tab(
-                    icon: Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        const Icon(Icons.shopping_cart),
-                        if (billingProvider.cart.isNotEmpty)
-                          Positioned(
-                            right: -10,
-                            top: -10,
-                            child: Container(
-                              padding: const EdgeInsets.all(4),
-                              decoration: const BoxDecoration(
-                                color: Color(0xFFBA1A1A),
-                                shape: BoxShape.circle,
-                              ),
-                              constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
-                              child: Text(
-                                '${billingProvider.cart.fold(0, (sum, item) => sum + item.quantity)}',
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                    text: 'Checkout (₹${NumberFormat('#,##,###').format(billingProvider.totalAmount)})',
-                  ),
-                ],
-              ),
       ),
       drawer: const SidebarDrawer(activeRoute: '/billing'),
       body: LayoutBuilder(
@@ -463,177 +425,323 @@ class _BillingScreenState extends State<BillingScreen> with SingleTickerProvider
               ],
             );
           } else {
-            // Mobile Tab-based layout
-            return TabBarView(
-              controller: _tabController,
+            // Mobile Unified layout (Catalog only on main screen)
+            return Column(
               children: [
-                // Tab 1: Catalog
-                Column(
-                  children: [
-                    // Customer Selection Header Panel
-                    _buildCustomerSelectPanel(billingProvider, filteredCustomers, currentSelectedCustomer),
+                // Customer Selection Header Panel
+                _buildCustomerSelectPanel(billingProvider, filteredCustomers, currentSelectedCustomer),
 
-                    // Service Search Filter Bar
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                      child: TextField(
-                        onChanged: (val) {
-                          setState(() {
-                            _serviceQuery = val;
-                          });
-                        },
-                        style: GoogleFonts.inter(fontSize: 13),
-                        decoration: InputDecoration(
-                          hintText: 'Filter services by name or SKU...',
-                          hintStyle: GoogleFonts.inter(color: const Color(0x997C839B), fontSize: 13),
-                          prefixIcon: const Icon(Icons.search, color: Color(0xFF7C839B)),
-                          filled: true,
-                          fillColor: Colors.white,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                          enabledBorder: OutlineInputBorder(
-                            borderSide: const BorderSide(color: Color(0xFFC6C6CD), width: 1.0),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderSide: const BorderSide(color: Color(0xFF006A61), width: 1.5),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
+                // Service Search Filter Bar
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                  child: TextField(
+                    onChanged: (val) {
+                      setState(() {
+                        _serviceQuery = val;
+                      });
+                    },
+                    style: GoogleFonts.inter(fontSize: 13),
+                    decoration: InputDecoration(
+                      hintText: 'Filter services by name or SKU...',
+                      hintStyle: GoogleFonts.inter(color: const Color(0x997C839B), fontSize: 13),
+                      prefixIcon: const Icon(Icons.search, color: Color(0xFF7C839B)),
+                      filled: true,
+                      fillColor: Colors.white,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      enabledBorder: OutlineInputBorder(
+                        borderSide: const BorderSide(color: Color(0xFFC6C6CD), width: 1.0),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderSide: const BorderSide(color: Color(0xFF006A61), width: 1.5),
+                        borderRadius: BorderRadius.circular(8),
                       ),
                     ),
+                  ),
+                ),
 
-                    // Category chips list
-                    Container(
-                      height: 48,
-                      padding: const EdgeInsets.symmetric(vertical: 6.0),
-                      child: ListView.builder(
-                        scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                        itemCount: categories.length,
-                        itemBuilder: (context, index) {
-                          final cat = categories[index];
-                          final isSelected = _selectedCategory == cat;
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                            child: ChoiceChip(
-                              label: Text(
-                                cat,
-                                style: GoogleFonts.inter(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color: isSelected ? Colors.white : const Color(0xFF45464D),
+                // Category chips list
+                Container(
+                  height: 48,
+                  padding: const EdgeInsets.symmetric(vertical: 6.0),
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                    itemCount: categories.length,
+                    itemBuilder: (context, index) {
+                      final cat = categories[index];
+                      final isSelected = _selectedCategory == cat;
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                        child: ChoiceChip(
+                          label: Text(
+                            cat,
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: isSelected ? Colors.white : const Color(0xFF45464D),
+                            ),
+                          ),
+                          selected: isSelected,
+                          selectedColor: const Color(0xFF006A61),
+                          backgroundColor: const Color(0xFFEFF4FF),
+                          onSelected: (selected) {
+                            setState(() {
+                              _selectedCategory = cat;
+                            });
+                          },
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const Divider(height: 1),
+
+                // Services Grid View
+                Expanded(
+                  child: filteredServices.isEmpty
+                      ? const Center(
+                          child: Text(
+                            'No services found.',
+                            style: TextStyle(color: Color(0xFF7C839B), fontWeight: FontWeight.bold),
+                          ),
+                        )
+                      : GridView.builder(
+                          padding: const EdgeInsets.all(12),
+                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            crossAxisSpacing: 10,
+                            mainAxisSpacing: 10,
+                            childAspectRatio: 1.25,
+                          ),
+                          itemCount: filteredServices.length,
+                          itemBuilder: (context, index) {
+                            final service = filteredServices[index];
+                            return Card(
+                              color: Colors.white,
+                              elevation: 1,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                side: const BorderSide(color: Color(0xFFE2E8F0)),
+                              ),
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(12),
+                                onTap: () {
+                                  billingProvider.addService(service);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('${service.name} added to cart.'),
+                                      duration: const Duration(seconds: 1),
+                                    ),
+                                  );
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.all(12.0),
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: const BoxDecoration(
+                                          color: Color(0xFFEFF4FF),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: _buildCategoryIcon(service.iconName),
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Text(
+                                        service.name,
+                                        maxLines: 2,
+                                        textAlign: TextAlign.center,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          color: const Color(0xFF0B1C30),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        '₹${NumberFormat('#,##,###').format(service.basePrice)}',
+                                        style: GoogleFonts.inter(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w900,
+                                          color: const Color(0xFF006A61),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
-                              selected: isSelected,
-                              selectedColor: const Color(0xFF006A61),
-                              backgroundColor: const Color(0xFFEFF4FF),
-                              onSelected: (selected) {
-                                setState(() {
-                                  _selectedCategory = cat;
-                                });
-                              },
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    const Divider(height: 1),
-
-                    // Services Grid View
-                    Expanded(
-                      child: filteredServices.isEmpty
-                          ? const Center(
-                              child: Text(
-                                'No services found.',
-                                style: TextStyle(color: Color(0xFF7C839B), fontWeight: FontWeight.bold),
-                              ),
-                            )
-                          : GridView.builder(
-                              padding: const EdgeInsets.all(12),
-                              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: 2,
-                                crossAxisSpacing: 10,
-                                mainAxisSpacing: 10,
-                                childAspectRatio: 1.25,
-                              ),
-                              itemCount: filteredServices.length,
-                              itemBuilder: (context, index) {
-                                final service = filteredServices[index];
-                                return Card(
-                                  color: Colors.white,
-                                  elevation: 1,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    side: const BorderSide(color: Color(0xFFE2E8F0)),
-                                  ),
-                                  child: InkWell(
-                                    borderRadius: BorderRadius.circular(12),
-                                    onTap: () {
-                                      billingProvider.addService(service);
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          content: Text('${service.name} added to cart.'),
-                                          duration: const Duration(seconds: 1),
-                                        ),
-                                      );
-                                    },
-                                    child: Padding(
-                                      padding: const EdgeInsets.all(12.0),
-                                      child: Column(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          Container(
-                                            padding: const EdgeInsets.all(8),
-                                            decoration: const BoxDecoration(
-                                              color: Color(0xFFEFF4FF),
-                                              shape: BoxShape.circle,
-                                            ),
-                                            child: _buildCategoryIcon(service.iconName),
-                                          ),
-                                          const SizedBox(height: 6),
-                                          Text(
-                                            service.name,
-                                            maxLines: 2,
-                                            textAlign: TextAlign.center,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: GoogleFonts.outfit(
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.bold,
-                                              color: const Color(0xFF0B1C30),
-                                            ),
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            '₹${NumberFormat('#,##,###').format(service.basePrice)}',
-                                            style: GoogleFonts.inter(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w900,
-                                              color: const Color(0xFF006A61),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                    ),
-                  ],
-                ),
-                // Tab 2: Checkout details
-                SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: _buildCheckoutPanelItems(billingProvider, currentSelectedCustomer),
-                  ),
+                            );
+                          },
+                        ),
                 ),
               ],
             );
           }
         },
       ),
+      bottomNavigationBar: (MediaQuery.of(context).size.width > 900 || billingProvider.cart.isEmpty)
+          ? null
+          : Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    offset: const Offset(0, -4),
+                    blurRadius: 10,
+                  ),
+                ],
+                border: const Border(
+                  top: BorderSide(color: Color(0xFFE2E8F0)),
+                ),
+              ),
+              child: SafeArea(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${billingProvider.cart.fold(0, (sum, item) => sum + item.quantity)} Services Selected',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            color: const Color(0xFF7C839B),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '₹${NumberFormat('#,##,###').format(billingProvider.totalAmount)}',
+                          style: GoogleFonts.outfit(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                            color: const Color(0xFF006A61),
+                          ),
+                        ),
+                      ],
+                    ),
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF006A61),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      ),
+                      onPressed: () {
+                        _showCheckoutBottomSheet(context, billingProvider, currentSelectedCustomer);
+                      },
+                      icon: const Icon(Icons.shopping_cart_checkout),
+                      label: Text(
+                        'Review & Pay',
+                        style: GoogleFonts.inter(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+    );
+  }
+
+  void _showCheckoutBottomSheet(
+    BuildContext context,
+    BillingProvider billingProvider,
+    Customer currentSelectedCustomer,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(20),
+          topRight: Radius.circular(20),
+        ),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+          ),
+          child: Consumer<BillingProvider>(
+            builder: (context, bp, child) {
+              Customer activeCust;
+              try {
+                activeCust = _customers.firstWhere((c) => c.id == bp.selectedCustomerId);
+              } catch (_) {
+                activeCust = currentSelectedCustomer;
+              }
+
+              return DraggableScrollableSheet(
+                initialChildSize: 0.85,
+                minChildSize: 0.5,
+                maxChildSize: 0.95,
+                expand: false,
+                builder: (context, scrollController) {
+                  return Column(
+                    children: [
+                      // Grab handle decoration
+                      Container(
+                        margin: const EdgeInsets.symmetric(vertical: 8),
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFC6C6CD),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                      // Header with close button
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Checkout Review',
+                              style: GoogleFonts.outfit(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: const Color(0xFF0B1C30),
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.close),
+                              onPressed: () => Navigator.pop(context),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Divider(height: 1),
+                      // Scrollable content containing all checkout details
+                      Expanded(
+                        child: SingleChildScrollView(
+                          controller: scrollController,
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: _buildCheckoutPanelItems(bp, activeCust),
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              );
+            },
+          ),
+        );
+      },
     );
   }
 
@@ -1139,6 +1247,13 @@ class _BillingScreenState extends State<BillingScreen> with SingleTickerProvider
         customerPhone: currentCustomer.phone,
       );
 
+      if (!mounted) return;
+
+      // If we are on mobile, close the bottom sheet first
+      if (MediaQuery.of(context).size.width <= 900) {
+        Navigator.of(context).pop();
+      }
+
       // Show success modal dialog
       if (!mounted) return;
       showDialog(
@@ -1193,11 +1308,42 @@ class _BillingScreenState extends State<BillingScreen> with SingleTickerProvider
               style: OutlinedButton.styleFrom(
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
-              onPressed: () {
+              onPressed: () async {
                 Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Receipt successfully sent to print pipeline.')),
-                );
+                final printerProvider = Provider.of<BluetoothPrinterProvider>(context, listen: false);
+                if (printerProvider.connectionState == PrinterConnectionState.connected) {
+                  final receiptText = printerProvider.formatReceipt(bill, businessName: bill.branchName ?? 'SmartBill Pro');
+                  _showReceiptPreviewDialog(context, bill, receiptText);
+                } else {
+                  // Show loading and auto connect in the background
+                  showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (loadingCtx) => const AlertDialog(
+                      content: Row(
+                        children: [
+                          CircularProgressIndicator(color: Color(0xFF006A61)),
+                          SizedBox(width: 20),
+                          Text('Connecting to printer...'),
+                        ],
+                      ),
+                    ),
+                  );
+                  final success = await printerProvider.autoDetectAndConnect();
+                  if (mounted) {
+                    Navigator.pop(context); // Close loading dialog
+                  }
+                  if (success) {
+                    final receiptText = printerProvider.formatReceipt(bill, businessName: bill.branchName ?? 'SmartBill Pro');
+                    if (mounted) {
+                      _showReceiptPreviewDialog(context, bill, receiptText);
+                    }
+                  } else {
+                    if (mounted) {
+                      _showNoPrinterDialog(context, bill);
+                    }
+                  }
+                }
               },
               child: Text('Print Receipt', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
             ),
@@ -1215,9 +1361,6 @@ class _BillingScreenState extends State<BillingScreen> with SingleTickerProvider
           ],
         ),
       );
-
-      // Return to services tab
-      _tabController.animateTo(0);
     } catch (e) {
       showDialog(
         context: context,
@@ -1259,6 +1402,140 @@ class _BillingScreenState extends State<BillingScreen> with SingleTickerProvider
                     fontWeight: FontWeight.bold,
                     color: const Color(0xFF0B1C30),
                   ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showReceiptPreviewDialog(BuildContext context, Bill bill, String receiptText) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Thermal Print Job',
+              style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 16, color: const Color(0xFF0B1C30)),
+            ),
+            IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: () => Navigator.pop(ctx),
+            ),
+          ],
+        ),
+        content: Container(
+          width: 320,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFAFAF7),
+            borderRadius: BorderRadius.circular(8),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 8,
+                offset: const Offset(0, 4),
+              ),
+            ],
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Receipt feed output
+              Container(
+                constraints: const BoxConstraints(maxHeight: 400),
+                child: SingleChildScrollView(
+                  child: Text(
+                    receiptText,
+                    style: GoogleFonts.shareTechMono(
+                      fontSize: 13,
+                      height: 1.3,
+                      color: const Color(0xFF1E293B),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Jagged paper tear representation at bottom
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(
+                  15,
+                  (index) => const Text(
+                    '/\\',
+                    style: TextStyle(
+                      color: Color(0xFFCBD5E1),
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF006A61),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () async {
+              final messenger = ScaffoldMessenger.of(context);
+              Navigator.pop(ctx);
+              final printerProvider = Provider.of<BluetoothPrinterProvider>(context, listen: false);
+              final success = await printerProvider.printBill(bill, businessName: bill.branchName ?? 'SmartBill Pro');
+              if (success) {
+                messenger.showSnackBar(
+                  const SnackBar(content: Text('Receipt printed successfully!')),
+                );
+              } else {
+                messenger.showSnackBar(
+                  SnackBar(content: Text('Failed to print: ${printerProvider.errorMessage ?? "Unknown error"}')),
+                );
+              }
+            },
+            child: Text('Confirm Print', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showNoPrinterDialog(BuildContext context, Bill bill) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'No Printer Paired',
+          style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 16, color: const Color(0xFF0B1C30)),
+        ),
+        content: Text(
+          'Could not find a paired Bluetooth billing printer on your device.\n\nPlease open your Mobile Settings -> Bluetooth, pair/connect your printing machine there, and then try again.',
+          style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF7C839B), height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Cancel', style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: const Color(0xFF7C839B))),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF006A61),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.pushNamed(context, '/settings');
+            },
+            child: Text('Check Settings', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
           ),
         ],
       ),

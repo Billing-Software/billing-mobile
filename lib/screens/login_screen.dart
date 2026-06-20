@@ -349,7 +349,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           CustomTextField(
                             controller: _serverUrlController,
                             label: 'Server API Endpoint',
-                            placeholder: 'http://192.168.1.2:5208/api',
+                            placeholder: 'https://e071-2401-4900-882d-e15c-753e-6498-b2f2-c2f0.ngrok-free.app/api',
                           ),
                           const SizedBox(height: 12),
                           ElevatedButton(
@@ -366,7 +366,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           const SizedBox(height: 8),
                           const Text(
-                            'Defaults: \n- Android Device/Wi-Fi: http://192.168.1.2:5208/api\n- Web/Desktop: http://localhost:5208/api',
+                            'Defaults: \n- Ngrok Tunnel: https://e071-2401-4900-882d-e15c-753e-6498-b2f2-c2f0.ngrok-free.app/api',
                             style: TextStyle(
                               fontSize: 10,
                               color: Color(0xFF7C839B),

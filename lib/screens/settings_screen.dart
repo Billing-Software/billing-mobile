@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 import '../models/settings.dart';
 import '../models/business.dart';
+import '../models/bill.dart';
 import '../services/settings_service.dart';
 import '../services/business_service.dart';
 import '../services/api_client.dart';
+import '../providers/bluetooth_printer_provider.dart';
+import '../services/bluetooth_printer_service.dart';
 import '../widgets/sidebar_drawer.dart';
 import '../widgets/custom_text_field.dart';
 
@@ -47,6 +51,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void initState() {
     super.initState();
     _fetchSettings();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        final printerProvider = Provider.of<BluetoothPrinterProvider>(context, listen: false);
+        if (printerProvider.connectionState != PrinterConnectionState.connected) {
+          printerProvider.startScan();
+        }
+      }
+    });
   }
 
   Future<void> _fetchSettings() async {
@@ -362,7 +374,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             CustomTextField(
               controller: _serverUrlController,
               label: 'Server Endpoint URL',
-              placeholder: 'http://localhost:5208/api',
+              placeholder: 'https://e071-2401-4900-882d-e15c-753e-6498-b2f2-c2f0.ngrok-free.app/api',
             ),
             const SizedBox(height: 10), // Shrank from 12
             ElevatedButton(
@@ -737,6 +749,296 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ],
         ),
       ),
+      const SizedBox(height: 24),
+      _buildSectionHeader('BLUETOOTH BILLING PRINTER GATEWAY', Icons.print_outlined),
+      const SizedBox(height: 12),
+      Consumer<BluetoothPrinterProvider>(
+        builder: (context, printerProvider, child) {
+          final isConnected = printerProvider.connectionState == PrinterConnectionState.connected;
+          final isConnecting = printerProvider.connectionState == PrinterConnectionState.connecting;
+          final hasSavedPrinter = printerProvider.savedPrinterAddress != null;
+          
+          return Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Connection status HUD
+                Row(
+                  children: [
+                    Text('Printer Status: ', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13)),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: isConnected
+                            ? const Color(0xFFE6F4EA)
+                            : isConnecting
+                                ? const Color(0xFFFEF7E0)
+                                : hasSavedPrinter
+                                    ? const Color(0xFFEFF4FF)
+                                    : const Color(0xFFFFDAD6),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        isConnecting
+                            ? 'CONNECTING'
+                            : isConnected
+                                ? 'CONNECTED'
+                                : hasSavedPrinter
+                                    ? 'PAIRED (READY)'
+                                    : 'NOT DETECTED',
+                        style: GoogleFonts.inter(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: isConnected
+                              ? const Color(0xFF1E8E3E)
+                              : isConnecting
+                                  ? const Color(0xFFB06000)
+                                  : hasSavedPrinter
+                                      ? const Color(0xFF006A61)
+                                      : const Color(0xFFBA1A1A),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                
+                if (isConnected && printerProvider.connectedDevice != null) ...[
+                  // Connected State UI
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8F9FF),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.print, color: Color(0xFF006A61)),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                printerProvider.connectedDevice!.name,
+                                style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13, color: const Color(0xFF0B1C30)),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'MAC Address: ${printerProvider.connectedDevice!.address}',
+                                style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF7C839B)),
+                              ),
+                            ],
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            printerProvider.disconnectDevice();
+                          },
+                          child: Text(
+                            'Disconnect',
+                            style: GoogleFonts.inter(color: const Color(0xFFBA1A1A), fontWeight: FontWeight.bold, fontSize: 12),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF006A61),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    onPressed: () {
+                      final testBill = Bill(
+                        id: 0,
+                        billNumber: 'INV-TEST-99',
+                        subtotal: 350.0,
+                        discountCode: 'WELCOME',
+                        discountAmount: 50.0,
+                        taxAmount: 15.0,
+                        totalAmount: 315.0,
+                        paymentMethod: 'UPI',
+                        status: 'Paid',
+                        createdAt: DateTime.now().toIso8601String(),
+                        customerName: 'Test Customer',
+                        customerPhone: '9876543210',
+                        staffName: 'Admin',
+                        branchName: _businessProfile?.tradingName ?? 'Main Branch',
+                        items: [
+                          BillItem(
+                            serviceId: 1,
+                            serviceName: 'Hair Styling & Wash',
+                            unitPrice: 350.0,
+                            quantity: 1,
+                            lineTotal: 350.0,
+                          ),
+                        ],
+                      );
+                      final receiptText = printerProvider.formatReceipt(testBill, businessName: _businessProfile?.legalName ?? 'SmartBill Pro');
+                      _showReceiptPreviewDialog(context, testBill, receiptText);
+                    },
+                    icon: const Icon(Icons.receipt_outlined),
+                    label: Text('Print Test Receipt', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
+                  ),
+                ] else if (hasSavedPrinter) ...[
+                  // Paired / Disconnected but saved state UI
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8F9FF),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.star, color: Color(0xFF006A61)),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                printerProvider.savedPrinterName ?? 'System Paired Printer',
+                                style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13, color: const Color(0xFF0B1C30)),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Address: ${printerProvider.savedPrinterAddress}',
+                                style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF7C839B)),
+                              ),
+                            ],
+                          ),
+                        ),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF006A61),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                            elevation: 0,
+                          ),
+                          onPressed: isConnecting
+                              ? null
+                              : () async {
+                                  await printerProvider.connectToSavedPrinter();
+                                },
+                          child: Text(isConnecting ? 'Connecting...' : 'Connect', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFEFF4FF),
+                      foregroundColor: const Color(0xFF006A61),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      elevation: 0,
+                    ),
+                    onPressed: printerProvider.isScanning
+                        ? null
+                        : () => printerProvider.autoDetectAndConnect(),
+                    icon: printerProvider.isScanning
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(color: Color(0xFF006A61), strokeWidth: 2),
+                          )
+                        : const Icon(Icons.sync_outlined),
+                    label: Text(
+                      printerProvider.isScanning ? 'Re-Detecting...' : 'Re-Detect & Connect',
+                      style: GoogleFonts.inter(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ] else ...[
+                  // Not detected/No printer paired UI
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF4F2),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFFFDAD6)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'No Paired Billing Printer Detected',
+                          style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13, color: const Color(0xFFBA1A1A)),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Please connect your thermal printer in your Mobile\'s Bluetooth Settings first. Once paired, our app will automatically detect and connect to it.',
+                          style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFFBA1A1A), height: 1.3),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF006A61),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    onPressed: printerProvider.isScanning
+                        ? null
+                        : () => printerProvider.autoDetectAndConnect(),
+                    icon: printerProvider.isScanning
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                          )
+                        : const Icon(Icons.sync_outlined),
+                    label: Text(
+                      printerProvider.isScanning ? 'Detecting...' : 'Scan & Auto-Detect Printer',
+                      style: GoogleFonts.inter(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+                
+                if (printerProvider.errorMessage != null) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFDAD6),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFBA1A1A)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.error_outline, color: Color(0xFFBA1A1A), size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            printerProvider.errorMessage!,
+                            style: GoogleFonts.inter(
+                              color: const Color(0xFFBA1A1A),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          );
+        },
+      ),
     ];
   }
 
@@ -823,6 +1125,105 @@ class _SettingsScreenState extends State<SettingsScreen> {
           Text(
             'Workspace updates undergo real time validation against system rules. Audit trails are compiled securely.',
             style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF7C839B), height: 1.3),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showReceiptPreviewDialog(BuildContext context, Bill bill, String receiptText) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Thermal Print Job',
+              style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 16, color: const Color(0xFF0B1C30)),
+            ),
+            IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: () => Navigator.pop(ctx),
+            ),
+          ],
+        ),
+        content: Container(
+          width: 320,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFAFAF7),
+            borderRadius: BorderRadius.circular(8),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 8,
+                offset: const Offset(0, 4),
+              ),
+            ],
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Receipt feed output
+              Container(
+                constraints: const BoxConstraints(maxHeight: 400),
+                child: SingleChildScrollView(
+                  child: Text(
+                    receiptText,
+                    style: GoogleFonts.shareTechMono(
+                      fontSize: 13,
+                      height: 1.3,
+                      color: const Color(0xFF1E293B),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Jagged paper tear representation at bottom
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(
+                  15,
+                  (index) => const Text(
+                    '/\\',
+                    style: TextStyle(
+                      color: Color(0xFFCBD5E1),
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF006A61),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () async {
+              final messenger = ScaffoldMessenger.of(context);
+              Navigator.pop(ctx);
+              final printerProvider = Provider.of<BluetoothPrinterProvider>(context, listen: false);
+              final success = await printerProvider.printBill(bill, businessName: _businessProfile?.legalName ?? 'SmartBill Pro');
+              if (success) {
+                messenger.showSnackBar(
+                  const SnackBar(content: Text('Test receipt printed successfully!')),
+                );
+              } else {
+                messenger.showSnackBar(
+                  SnackBar(content: Text('Failed to print: ${printerProvider.errorMessage ?? "Unknown error"}')),
+                );
+              }
+            },
+            child: Text('Confirm Print', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
           ),
         ],
       ),
