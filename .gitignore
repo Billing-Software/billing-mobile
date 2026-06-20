@@ -1,34 +1,80 @@
-# Gradle files
-.gradle/
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.buildlog/
+.history
+.project
+.idea/
+.packages
+.pub-cache/
+.pub/
+.VSCode/
+.vscode/
+
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
 build/
 
-# Local configuration file (sdk path, etc)
-local.properties
-
-# Log/OS Files
-*.log
-
-# Android Studio generated files and folders
-captures/
-.externalNativeBuild/
-.cxx/
-*.aab
-*.apk
-output-metadata.json
-
-# IntelliJ
-*.iml
-.idea/
-misc.xml
-deploymentTargetDropDown.xml
-render.experimental.xml
-
-# Keystore files
+# Android related
+**/android/local.properties
+**/android/key.properties
+**/android/app/local.properties
+**/android/app/generated/
+**/android/app/src/main/res/values/strings.xml
 *.jks
 *.keystore
+*.apk
+*.aab
 
-# Google Services (e.g. APIs or Firebase)
-google-services.json
+# iOS/macOS related
+**/ios/Flutter/Generated.xcconfig
+**/ios/Flutter/flutter_export_environment.sh
+**/ios/Flutter/flutter_export_environment.plist
+**/ios/Flutter/xcconfig
+**/ios/Flutter/App.framework
+**/ios/Flutter/Flutter.framework
+**/ios/Flutter/Flutter.podspec
+**/ios/Runner/GeneratedPluginRegistrant.h
+**/ios/Runner/GeneratedPluginRegistrant.m
+**/ios/Runner/GeneratedPluginRegistrant.swift
+**/ios/Runner/Assets.xcassets/AppIcon.appiconset/
+**/ios/Runner/GoogleService-Info.plist
+**/ios/Runner/config.json
+**/ios/Runner/keys.json
+**/ios/Runner/keys.plist
+**/ios/Runner/keys.xml
+**/ios/Runner/secrets.json
+**/ios/Runner/secrets.plist
+**/ios/Runner/secrets.xml
+**/ios/Runner/keys/
+**/ios/Runner/secrets/
+**/ios/Runner/keys.properties
+**/ios/Runner/secrets.properties
+**/ios/Runner/keys.yaml
+**/ios/Runner/secrets.yaml
+**/ios/.symlinks/
+**/ios/Pods/
+**/ios/.xcworkspace
+**/macos/Flutter/ephemeral/
+**/macos/Flutter/GeneratedPluginRegistrant.swift
+**/macos/Flutter/Flutter-Generated.xcconfig
 
-# Android Profiling
-*.hprof
+# Linux related
+**/linux/flutter/ephemeral/
+
+# Windows related
+**/windows/flutter/ephemeral/
+
+# Crashes
+flutter_*.png
+flutter_*.jpg
+flutter_*.jpeg
