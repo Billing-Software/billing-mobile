@@ -6,7 +6,7 @@ import '../models/business.dart';
 import '../models/bill.dart';
 import '../services/settings_service.dart';
 import '../services/business_service.dart';
-import '../services/api_client.dart';
+
 import '../providers/bluetooth_printer_provider.dart';
 import '../services/bluetooth_printer_service.dart';
 import '../widgets/sidebar_drawer.dart';
@@ -29,7 +29,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   final _apiKeyController = TextEditingController();
   final _newTemplateController = TextEditingController();
-  final _serverUrlController = TextEditingController();
 
   // Corporate Profile controllers
   final _legalNameController = TextEditingController();
@@ -69,12 +68,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     try {
       final settings = await _settingsService.getWhatsAppSettings();
       final profile = await _businessService.getProfile();
-      final url = await ApiClient().getBaseUrl();
       if (!mounted) return;
       setState(() {
         _whatsAppSettings = settings;
         _apiKeyController.text = settings.apiKey;
-        _serverUrlController.text = url;
 
         _businessProfile = profile;
         _legalNameController.text = profile.legalName;
@@ -216,23 +213,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  Future<void> _saveServerUrl() async {
-    final url = _serverUrlController.text.trim();
-    if (url.isNotEmpty) {
-      await ApiClient().setBaseUrl(url);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Server endpoint updated to: $url')),
-        );
-      }
-    }
-  }
+  // Removed server URL config capability
 
   @override
   void dispose() {
     _apiKeyController.dispose();
     _newTemplateController.dispose();
-    _serverUrlController.dispose();
     _legalNameController.dispose();
     _tradingNameController.dispose();
     _logoUrlController.dispose();
@@ -357,48 +343,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   List<Widget> _buildSettingsPanels(bool isConnected, double width) {
     return [
-      // API URL settings
-      _buildSectionHeader('API SERVER CONFIGURATION', Icons.settings_ethernet),
-      const SizedBox(height: 12),
-      Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              'Configure the backend C# Server IP Address here to synchronize all POS client transactions.',
-              style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF7C839B)),
-            ),
-            const SizedBox(height: 10), // Shrank from 14
-            CustomTextField(
-              controller: _serverUrlController,
-              label: 'Server Endpoint URL',
-              placeholder: 'https://4265-2401-4900-882d-e15c-39ba-a63b-944e-b565.ngrok-free.app/api',
-              keyboardType: TextInputType.url,
-              textInputAction: TextInputAction.done,
-              autocorrect: false,
-              enableSuggestions: false,
-              onFieldSubmitted: (_) => _saveServerUrl(),
-            ),
-            const SizedBox(height: 10), // Shrank from 12
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF006A61),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-              onPressed: _saveServerUrl,
-              child: Text('Save Server URL', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
-            ),
-          ],
-        ),
-      ),
-      const SizedBox(height: 24),
+
 
       // Corporate Entity Profile Form
       _buildSectionHeader('LEGAL BUSINESS NODE', Icons.business_outlined),

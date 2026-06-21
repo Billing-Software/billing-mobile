@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../providers/auth_provider.dart';
-import '../services/api_client.dart';
+
 import '../widgets/custom_button.dart';
 import '../widgets/custom_text_field.dart';
 
@@ -47,35 +47,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
   int _registerStep = 1;
 
-  final _serverUrlController = TextEditingController();
-
   bool _isRegisterMode = false;
-  bool _showServerConfig = false;
   bool _isCheckingAvailability = false;
 
   @override
   void initState() {
     super.initState();
-    _loadServerUrl();
-  }
-
-  Future<void> _loadServerUrl() async {
-    final url = await ApiClient().getBaseUrl();
-    setState(() {
-      _serverUrlController.text = url;
-    });
-  }
-
-  Future<void> _saveServerUrl() async {
-    final url = _serverUrlController.text.trim();
-    if (url.isNotEmpty) {
-      await ApiClient().setBaseUrl(url);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Server API URL updated to: $url')),
-        );
-      }
-    }
   }
 
   @override
@@ -96,7 +73,6 @@ class _LoginScreenState extends State<LoginScreen> {
     _registerCityController.dispose();
     _registerStateController.dispose();
     _registerPostalCodeController.dispose();
-    _serverUrlController.dispose();
     super.dispose();
   }
 
@@ -872,67 +848,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ],
                       const SizedBox(height: 24),
-  
-                      TextButton.icon(
-                        style: TextButton.styleFrom(
-                          foregroundColor: const Color(0xFF7C839B),
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            _showServerConfig = !_showServerConfig;
-                          });
-                        },
-                        icon: const Icon(Icons.settings_ethernet, size: 16),
-                        label: Text(
-                          _showServerConfig ? 'Hide Server Parameters' : 'Configure Server Endpoint',
-                          style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13),
-                        ),
-                      ),
-  
-                      // Server Config HUD
-                      if (_showServerConfig) ...[
-                        const SizedBox(height: 12),
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFEFF4FF),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: const Color(0xFFE2E8F0)),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              CustomTextField(
-                                controller: _serverUrlController,
-                                label: 'Server API Endpoint',
-                                placeholder: 'https://4265-2401-4900-882d-e15c-39ba-a63b-944e-b565.ngrok-free.app/api',
-                              ),
-                              const SizedBox(height: 12),
-                              ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.white,
-                                  foregroundColor: const Color(0xFF006A61),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                    side: const BorderSide(color: Color(0xFFC6C6CD)),
-                                  ),
-                                ),
-                                onPressed: _saveServerUrl,
-                                child: const Text('Update Base API URL'),
-                              ),
-                              const SizedBox(height: 8),
-                              const Text(
-                                'Defaults: \n- Ngrok Tunnel: https://4265-2401-4900-882d-e15c-39ba-a63b-944e-b565.ngrok-free.app/api',
-                                style: TextStyle(
-                                    fontSize: 10,
-                                    color: Color(0xFF7C839B),
-                                    height: 1.4,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
                     ],
                   ),
                 ),
