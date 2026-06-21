@@ -52,4 +52,20 @@ class AuthService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(ApiClient.keyAuthData);
   }
+
+  Future<bool> checkUsernameExists(String username) async {
+    final response = await _client.get('/auth/check-username?username=${Uri.encodeComponent(username)}');
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return response.body.trim().toLowerCase() == 'true';
+    }
+    throw Exception('Failed to check username availability');
+  }
+
+  Future<bool> checkEmailExists(String email) async {
+    final response = await _client.get('/auth/check-email?email=${Uri.encodeComponent(email)}');
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return response.body.trim().toLowerCase() == 'true';
+    }
+    throw Exception('Failed to check email availability');
+  }
 }

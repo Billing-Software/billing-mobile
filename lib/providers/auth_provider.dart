@@ -90,4 +90,12 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  Future<bool> checkUsernameExists(String username) async {
+    return await _authService.checkUsernameExists(username);
+  }
+
+  Future<bool> checkEmailExists(String email) async {
+    return await _authService.checkEmailExists(email);
+  }
 }

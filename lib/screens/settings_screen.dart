@@ -305,49 +305,53 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ],
       ),
       drawer: const SidebarDrawer(activeRoute: '/settings'),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFF006A61)))
-          : Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1200),
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(16.0),
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      final width = constraints.maxWidth;
-                      if (width > 900) {
-                        return Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              flex: 8,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: _buildSettingsPanels(isConnected, width),
+      body: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(),
+        behavior: HitTestBehavior.translucent,
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator(color: Color(0xFF006A61)))
+            : Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1200),
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(16.0),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final width = constraints.maxWidth;
+                        if (width > 900) {
+                          return Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                flex: 8,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  children: _buildSettingsPanels(isConnected, width),
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: 20),
-                            Expanded(
-                              flex: 4,
-                              child: _buildMetaDetailsPanel(),
-                            ),
-                          ],
-                        );
-                      } else {
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            ..._buildSettingsPanels(isConnected, width),
-                            const SizedBox(height: 20),
-                            _buildMetaDetailsPanel(),
-                          ],
-                        );
-                      }
-                    },
+                              const SizedBox(width: 20),
+                              Expanded(
+                                flex: 4,
+                                child: _buildMetaDetailsPanel(),
+                              ),
+                            ],
+                          );
+                        } else {
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              ..._buildSettingsPanels(isConnected, width),
+                              const SizedBox(height: 20),
+                              _buildMetaDetailsPanel(),
+                            ],
+                          );
+                        }
+                      },
+                    ),
                   ),
                 ),
               ),
-            ),
+      ),
     );
   }
 
@@ -374,7 +378,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
             CustomTextField(
               controller: _serverUrlController,
               label: 'Server Endpoint URL',
-              placeholder: 'https://e071-2401-4900-882d-e15c-753e-6498-b2f2-c2f0.ngrok-free.app/api',
+              placeholder: 'https://4265-2401-4900-882d-e15c-39ba-a63b-944e-b565.ngrok-free.app/api',
+              keyboardType: TextInputType.url,
+              textInputAction: TextInputAction.done,
+              autocorrect: false,
+              enableSuggestions: false,
+              onFieldSubmitted: (_) => _saveServerUrl(),
             ),
             const SizedBox(height: 10), // Shrank from 12
             ElevatedButton(
@@ -415,11 +424,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 controller: _legalNameController,
                 label: 'Legal Company Name',
                 placeholder: 'e.g. Acme Corp Private Ltd',
+                textCapitalization: TextCapitalization.words,
+                textInputAction: TextInputAction.next,
+                autofillHints: const [AutofillHints.organizationName],
               ),
               child2: CustomTextField(
                 controller: _tradingNameController,
                 label: 'Trading Name (Brand Name)',
                 placeholder: 'e.g. Acme Brand',
+                textCapitalization: TextCapitalization.words,
+                textInputAction: TextInputAction.next,
               ),
             ),
             const SizedBox(height: 12), // Shrank from 16
@@ -484,6 +498,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           controller: _logoUrlController,
                           label: 'Logo Image URL',
                           placeholder: 'https://acme.com/assets/logo.png',
+                          keyboardType: TextInputType.url,
+                          textInputAction: TextInputAction.next,
+                          autocorrect: false,
+                          enableSuggestions: false,
                           onChanged: (_) {
                             setState(() {});
                           },
@@ -502,11 +520,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 controller: _websiteController,
                 label: 'Website URL',
                 placeholder: 'https://example.com',
+                keyboardType: TextInputType.url,
+                textInputAction: TextInputAction.next,
+                autocorrect: false,
+                enableSuggestions: false,
+                autofillHints: const [AutofillHints.url],
               ),
               child2: CustomTextField(
                 controller: _phoneController,
                 label: 'Business Phone Number',
                 placeholder: '+91 98765 43210',
+                keyboardType: TextInputType.phone,
+                textInputAction: TextInputAction.next,
+                autofillHints: const [AutofillHints.telephoneNumber],
               ),
             ),
             const SizedBox(height: 16),
@@ -514,12 +540,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
               controller: _emailController,
               label: 'Business Email Address',
               placeholder: 'info@business.com',
+              keyboardType: TextInputType.emailAddress,
+              textInputAction: TextInputAction.next,
+              autocorrect: false,
+              enableSuggestions: false,
+              autofillHints: const [AutofillHints.email],
             ),
             const SizedBox(height: 16),
             CustomTextField(
               controller: _addressController,
               label: 'Headquarters Street Address',
               placeholder: '123 Enterprise Blvd',
+              textCapitalization: TextCapitalization.words,
+              textInputAction: TextInputAction.next,
+              autofillHints: const [AutofillHints.streetAddressLine1],
             ),
             const SizedBox(height: 16),
             _buildResponsiveRow(
@@ -528,11 +562,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 controller: _cityController,
                 label: 'Corporate City',
                 placeholder: 'e.g. Hyderabad',
+                textCapitalization: TextCapitalization.words,
+                textInputAction: TextInputAction.next,
+                autofillHints: const [AutofillHints.addressCity],
               ),
               child2: CustomTextField(
                 controller: _stateController,
                 label: 'Corporate State',
                 placeholder: 'e.g. Telangana',
+                textCapitalization: TextCapitalization.words,
+                textInputAction: TextInputAction.next,
+                autofillHints: const [AutofillHints.addressState],
               ),
             ),
             const SizedBox(height: 16),
@@ -542,11 +582,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 controller: _postalCodeController,
                 label: 'Postal Code (ZIP)',
                 placeholder: 'e.g. 500081',
+                keyboardType: TextInputType.number,
+                textInputAction: TextInputAction.next,
+                autofillHints: const [AutofillHints.postalCode],
               ),
               child2: CustomTextField(
                 controller: _gstInController,
                 label: 'GSTIN Registration Code',
                 placeholder: 'GSTIN Code or N/A',
+                textCapitalization: TextCapitalization.characters,
+                autocorrect: false,
+                textInputAction: TextInputAction.done,
+                onFieldSubmitted: (_) => _updateBusinessProfile(),
               ),
             ),
             const SizedBox(height: 16),
@@ -653,6 +700,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
               label: 'WhatsApp API Secret Key',
               placeholder: 'Enter API Key...',
               obscureText: true,
+              textInputAction: TextInputAction.done,
+              autocorrect: false,
+              enableSuggestions: false,
+              onFieldSubmitted: (_) => _updateWhatsAppSettings(),
             ),
             const SizedBox(height: 10), // Shrank from 12
             ElevatedButton(
@@ -692,6 +743,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     label: 'New Template Text',
                     placeholder: 'Configure new automated messages template...',
                     maxLines: 3,
+                    textCapitalization: TextCapitalization.sentences,
                   ),
                 ),
                 const SizedBox(width: 8),

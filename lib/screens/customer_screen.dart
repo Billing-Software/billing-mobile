@@ -67,6 +67,9 @@ class _CustomerScreenState extends State<CustomerScreen> {
               controller: nameController,
               label: 'Name',
               placeholder: 'e.g. John Doe',
+              textInputAction: TextInputAction.next,
+              textCapitalization: TextCapitalization.words,
+              autofillHints: const [AutofillHints.name],
             ),
             const SizedBox(height: 12),
             CustomTextField(
@@ -74,6 +77,8 @@ class _CustomerScreenState extends State<CustomerScreen> {
               label: 'Contact Phone',
               placeholder: 'e.g. 9876543210',
               keyboardType: TextInputType.phone,
+              textInputAction: TextInputAction.next,
+              autofillHints: const [AutofillHints.telephoneNumber],
             ),
             const SizedBox(height: 12),
             CustomTextField(
@@ -81,6 +86,9 @@ class _CustomerScreenState extends State<CustomerScreen> {
               label: 'Email (Optional)',
               placeholder: 'e.g. john@business.com',
               keyboardType: TextInputType.emailAddress,
+              textInputAction: TextInputAction.done,
+              autofillHints: const [AutofillHints.email],
+              autocorrect: false,
             ),
           ],
         ),
@@ -164,7 +172,9 @@ class _CustomerScreenState extends State<CustomerScreen> {
           (c.email?.toLowerCase().contains(_searchQuery.toLowerCase()) ?? false);
     }).toList();
 
-    return Scaffold(
+    return GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(),
+      child: Scaffold(
       backgroundColor: const Color(0xFFF8F9FF),
       appBar: AppBar(
         title: Text('Customer CRM', style: GoogleFonts.outfit(fontWeight: FontWeight.w900)),
@@ -194,6 +204,8 @@ class _CustomerScreenState extends State<CustomerScreen> {
                             _searchQuery = val;
                           });
                         },
+                        textInputAction: TextInputAction.search,
+                        autocorrect: false,
                         style: GoogleFonts.inter(fontSize: 13),
                         decoration: InputDecoration(
                           hintText: 'Search customers by name, phone or email...',
@@ -300,6 +312,7 @@ class _CustomerScreenState extends State<CustomerScreen> {
                 ),
               ),
             ),
+        ),
     );
   }
 }

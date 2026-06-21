@@ -103,12 +103,18 @@ class _StaffScreenState extends State<StaffScreen> {
                   controller: nameController,
                   label: 'Name',
                   placeholder: 'e.g. David Miller',
+                  textCapitalization: TextCapitalization.words,
+                  textInputAction: TextInputAction.next,
+                  autofillHints: const [AutofillHints.name],
                 ),
                 const SizedBox(height: 12),
                 CustomTextField(
                   controller: empCodeController,
                   label: 'Employee Code',
                   placeholder: 'e.g. SB-102',
+                  textCapitalization: TextCapitalization.characters,
+                  autocorrect: false,
+                  textInputAction: TextInputAction.next,
                 ),
                 const SizedBox(height: 12),
                 CustomTextField(
@@ -116,6 +122,8 @@ class _StaffScreenState extends State<StaffScreen> {
                   label: 'Contact Number',
                   placeholder: 'e.g. 9876543210',
                   keyboardType: TextInputType.phone,
+                  textInputAction: TextInputAction.done,
+                  autofillHints: const [AutofillHints.telephoneNumber],
                 ),
                 const SizedBox(height: 12),
                 _buildDropdownField(
@@ -250,40 +258,46 @@ class _StaffScreenState extends State<StaffScreen> {
         onPressed: () => _showAddEditDialog(),
         child: const Icon(Icons.add),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFF006A61)))
-          : Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1200),
-                child: Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
-                      child: TextField(
-                        onChanged: (val) {
-                          setState(() {
-                            _searchQuery = val;
-                          });
-                        },
-                        style: GoogleFonts.inter(fontSize: 13),
-                        decoration: InputDecoration(
-                          hintText: 'Search staff by name, code or role...',
-                          hintStyle: GoogleFonts.inter(color: const Color(0x997C839B), fontSize: 13),
-                          prefixIcon: const Icon(Icons.search, size: 20),
-                          filled: true,
-                          fillColor: Colors.white,
-                          contentPadding: const EdgeInsets.symmetric(vertical: 0),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: const BorderSide(color: Color(0xFFC6C6CD)),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: const BorderSide(color: Color(0xFF006A61), width: 1.5),
+      body: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(),
+        behavior: HitTestBehavior.translucent,
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator(color: Color(0xFF006A61)))
+            : Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1200),
+                  child: Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
+                        child: TextField(
+                          onChanged: (val) {
+                            setState(() {
+                              _searchQuery = val;
+                            });
+                          },
+                          style: GoogleFonts.inter(fontSize: 13),
+                          textInputAction: TextInputAction.search,
+                          autocorrect: false,
+                          onSubmitted: (_) => FocusScope.of(context).unfocus(),
+                          decoration: InputDecoration(
+                            hintText: 'Search staff by name, code or role...',
+                            hintStyle: GoogleFonts.inter(color: const Color(0x997C839B), fontSize: 13),
+                            prefixIcon: const Icon(Icons.search, size: 20),
+                            filled: true,
+                            fillColor: Colors.white,
+                            contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(color: Color(0xFFC6C6CD)),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(color: Color(0xFF006A61), width: 1.5),
+                            ),
                           ),
                         ),
                       ),
-                    ),
                     Expanded(
                       child: filtered.isEmpty
                           ? Center(
@@ -415,6 +429,7 @@ class _StaffScreenState extends State<StaffScreen> {
                 ),
               ),
             ),
+      ),
     );
   }
 }

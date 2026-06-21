@@ -13,6 +13,12 @@ class CustomTextField extends StatefulWidget {
   final int maxLines;
   final ValueChanged<String>? onChanged;
   final bool isDense;
+  final TextInputAction? textInputAction;
+  final Iterable<String>? autofillHints;
+  final TextCapitalization textCapitalization;
+  final bool autocorrect;
+  final bool enableSuggestions;
+  final ValueChanged<String>? onFieldSubmitted;
 
   const CustomTextField({
     Key? key,
@@ -27,6 +33,12 @@ class CustomTextField extends StatefulWidget {
     this.maxLines = 1,
     this.onChanged,
     this.isDense = false,
+    this.textInputAction,
+    this.autofillHints,
+    this.textCapitalization = TextCapitalization.none,
+    this.autocorrect = true,
+    this.enableSuggestions = true,
+    this.onFieldSubmitted,
   }) : super(key: key);
 
   @override
@@ -64,6 +76,12 @@ class _CustomTextFieldState extends State<CustomTextField> {
           validator: widget.validator,
           maxLines: widget.maxLines,
           onChanged: widget.onChanged,
+          textInputAction: widget.textInputAction,
+          autofillHints: widget.autofillHints,
+          textCapitalization: widget.textCapitalization,
+          autocorrect: widget.autocorrect,
+          enableSuggestions: widget.enableSuggestions,
+          onFieldSubmitted: widget.onFieldSubmitted,
           style: GoogleFonts.inter(
             fontSize: 14,
             fontWeight: FontWeight.w600,

@@ -106,18 +106,25 @@ class _ServiceScreenState extends State<ServiceScreen> {
                   controller: nameController,
                   label: 'Service Name',
                   placeholder: 'e.g. Haircut & Trim',
+                  textCapitalization: TextCapitalization.words,
+                  textInputAction: TextInputAction.next,
                 ),
                 const SizedBox(height: 12),
                 CustomTextField(
                   controller: skuController,
                   label: 'SKU Code',
                   placeholder: 'e.g. HC-01',
+                  textCapitalization: TextCapitalization.characters,
+                  autocorrect: false,
+                  textInputAction: TextInputAction.next,
                 ),
                 const SizedBox(height: 12),
                 CustomTextField(
                   controller: categoryController,
                   label: 'Category',
                   placeholder: 'e.g. Haircut',
+                  textCapitalization: TextCapitalization.words,
+                  textInputAction: TextInputAction.next,
                 ),
                 const SizedBox(height: 12),
                 CustomTextField(
@@ -125,6 +132,7 @@ class _ServiceScreenState extends State<ServiceScreen> {
                   label: 'Base Price (₹)',
                   placeholder: 'e.g. 299',
                   keyboardType: TextInputType.number,
+                  textInputAction: TextInputAction.next,
                 ),
                 const SizedBox(height: 12),
                 CustomTextField(
@@ -132,6 +140,7 @@ class _ServiceScreenState extends State<ServiceScreen> {
                   label: 'Tax Rate (%)',
                   placeholder: 'e.g. 5.0',
                   keyboardType: TextInputType.number,
+                  textInputAction: TextInputAction.done,
                 ),
                 const SizedBox(height: 12),
                 _buildDropdownField(
@@ -291,41 +300,47 @@ class _ServiceScreenState extends State<ServiceScreen> {
         onPressed: () => _showAddEditDialog(),
         child: const Icon(Icons.add),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFF006A61)))
-          : Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1200),
-                child: Column(
-                  children: [
-                    // Filters
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
-                      child: TextField(
-                        onChanged: (val) {
-                          setState(() {
-                            _searchQuery = val;
-                          });
-                        },
-                        style: GoogleFonts.inter(fontSize: 13),
-                        decoration: InputDecoration(
-                          hintText: 'Search catalog by name or SKU...',
-                          hintStyle: GoogleFonts.inter(color: const Color(0x997C839B), fontSize: 13),
-                          prefixIcon: const Icon(Icons.search, size: 20),
-                          filled: true,
-                          fillColor: Colors.white,
-                          contentPadding: const EdgeInsets.symmetric(vertical: 0),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: const BorderSide(color: Color(0xFFC6C6CD)),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: const BorderSide(color: Color(0xFF006A61), width: 1.5),
+      body: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(),
+        behavior: HitTestBehavior.translucent,
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator(color: Color(0xFF006A61)))
+            : Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1200),
+                  child: Column(
+                    children: [
+                      // Filters
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
+                        child: TextField(
+                          onChanged: (val) {
+                            setState(() {
+                              _searchQuery = val;
+                            });
+                          },
+                          style: GoogleFonts.inter(fontSize: 13),
+                          textInputAction: TextInputAction.search,
+                          autocorrect: false,
+                          onSubmitted: (_) => FocusScope.of(context).unfocus(),
+                          decoration: InputDecoration(
+                            hintText: 'Search catalog by name or SKU...',
+                            hintStyle: GoogleFonts.inter(color: const Color(0x997C839B), fontSize: 13),
+                            prefixIcon: const Icon(Icons.search, size: 20),
+                            filled: true,
+                            fillColor: Colors.white,
+                            contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(color: Color(0xFFC6C6CD)),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(color: Color(0xFF006A61), width: 1.5),
+                            ),
                           ),
                         ),
                       ),
-                    ),
                     // Categories
                     Container(
                       height: 40,
@@ -459,6 +474,7 @@ class _ServiceScreenState extends State<ServiceScreen> {
                 ),
               ),
             ),
+      ),
     );
   }
 }

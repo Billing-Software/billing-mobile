@@ -233,7 +233,9 @@ class _BillingScreenState extends State<BillingScreen> {
       }
     }
 
-    return Scaffold(
+    return GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(),
+      child: Scaffold(
       backgroundColor: const Color(0xFFF8F9FF),
       appBar: AppBar(
         title: Text(
@@ -267,6 +269,8 @@ class _BillingScreenState extends State<BillingScreen> {
                               _serviceQuery = val;
                             });
                           },
+                          textInputAction: TextInputAction.search,
+                          autocorrect: false,
                           style: GoogleFonts.inter(fontSize: 13),
                           decoration: InputDecoration(
                             hintText: 'Filter services by name or SKU...',
@@ -440,6 +444,8 @@ class _BillingScreenState extends State<BillingScreen> {
                         _serviceQuery = val;
                       });
                     },
+                    textInputAction: TextInputAction.search,
+                    autocorrect: false,
                     style: GoogleFonts.inter(fontSize: 13),
                     decoration: InputDecoration(
                       hintText: 'Filter services by name or SKU...',
@@ -651,6 +657,7 @@ class _BillingScreenState extends State<BillingScreen> {
                 ),
               ),
             ),
+      ),
     );
   }
 
@@ -939,6 +946,14 @@ class _BillingScreenState extends State<BillingScreen> {
                   child: TextField(
                     controller: _promoController,
                     style: GoogleFonts.inter(fontSize: 13),
+                    textInputAction: TextInputAction.done,
+                    autocorrect: false,
+                    textCapitalization: TextCapitalization.characters,
+                    onSubmitted: (val) {
+                      final msg = billingProvider.applyPromo(val);
+                      _promoController.clear();
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+                    },
                     decoration: InputDecoration(
                       hintText: 'Enter Promo Code (e.g. VIP10)',
                       hintStyle: GoogleFonts.inter(color: const Color(0x997C839B), fontSize: 13),
@@ -1100,6 +1115,9 @@ class _BillingScreenState extends State<BillingScreen> {
                           controller: _newCustNameController,
                           label: 'Customer Name',
                           placeholder: 'e.g. John Doe',
+                          textInputAction: TextInputAction.next,
+                          textCapitalization: TextCapitalization.words,
+                          autofillHints: const [AutofillHints.name],
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -1109,6 +1127,9 @@ class _BillingScreenState extends State<BillingScreen> {
                           label: 'Customer Phone',
                           placeholder: 'e.g. 9876543210',
                           keyboardType: TextInputType.phone,
+                          textInputAction: TextInputAction.done,
+                          autofillHints: const [AutofillHints.telephoneNumber],
+                          onFieldSubmitted: (_) => _createNewCustomer(),
                         ),
                       ),
                     ],
@@ -1136,6 +1157,8 @@ class _BillingScreenState extends State<BillingScreen> {
                 _customerQuery = val;
               });
             },
+            textInputAction: TextInputAction.search,
+            autocorrect: false,
             style: GoogleFonts.inter(fontSize: 13),
             decoration: InputDecoration(
               hintText: 'Search walk-in or phone (e.g. John/987)...',

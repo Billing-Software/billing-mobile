@@ -37,6 +37,11 @@ class SmartBillApp extends StatelessWidget {
     final authProvider = Provider.of<AuthProvider>(context);
     final isLoggedIn = authProvider.currentUser != null;
 
+    Widget getScreen(BuildContext context, Widget screen) {
+      final auth = Provider.of<AuthProvider>(context, listen: false);
+      return auth.currentUser != null ? screen : const LoginScreen();
+    }
+
     return MaterialApp(
       title: 'SmartBill Pro Mobile',
       theme: themeProvider.currentTheme,
@@ -44,16 +49,16 @@ class SmartBillApp extends StatelessWidget {
       home: isLoggedIn ? const DashboardScreen() : const LoginScreen(),
       routes: {
         '/login': (context) => const LoginScreen(),
-        '/dashboard': (context) => isLoggedIn ? const DashboardScreen() : const LoginScreen(),
-        '/billing': (context) => isLoggedIn ? const BillingScreen() : const LoginScreen(),
-        '/customers': (context) => isLoggedIn ? const CustomerScreen() : const LoginScreen(),
-        '/services': (context) => isLoggedIn ? const ServiceScreen() : const LoginScreen(),
-        '/inventory': (context) => isLoggedIn ? const InventoryScreen() : const LoginScreen(),
-        '/staff': (context) => isLoggedIn ? const StaffScreen() : const LoginScreen(),
-        '/settings': (context) => isLoggedIn ? const SettingsScreen() : const LoginScreen(),
+        '/dashboard': (context) => getScreen(context, const DashboardScreen()),
+        '/billing': (context) => getScreen(context, const BillingScreen()),
+        '/customers': (context) => getScreen(context, const CustomerScreen()),
+        '/services': (context) => getScreen(context, const ServiceScreen()),
+        '/inventory': (context) => getScreen(context, const InventoryScreen()),
+        '/staff': (context) => getScreen(context, const StaffScreen()),
+        '/settings': (context) => getScreen(context, const SettingsScreen()),
       },
       onUnknownRoute: (settings) => MaterialPageRoute(
-        builder: (context) => isLoggedIn ? const DashboardScreen() : const LoginScreen(),
+        builder: (context) => getScreen(context, const DashboardScreen()),
       ),
     );
   }

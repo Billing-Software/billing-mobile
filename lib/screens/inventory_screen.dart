@@ -72,18 +72,25 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 controller: nameController,
                 label: 'Item Name',
                 placeholder: 'e.g. Organic Shampoo',
+                textCapitalization: TextCapitalization.words,
+                textInputAction: TextInputAction.next,
               ),
               const SizedBox(height: 12),
               CustomTextField(
                 controller: skuController,
                 label: 'SKU Code',
                 placeholder: 'e.g. SH-01',
+                textCapitalization: TextCapitalization.characters,
+                autocorrect: false,
+                textInputAction: TextInputAction.next,
               ),
               const SizedBox(height: 12),
               CustomTextField(
                 controller: categoryController,
                 label: 'Category',
                 placeholder: 'e.g. Haircare',
+                textCapitalization: TextCapitalization.words,
+                textInputAction: TextInputAction.next,
               ),
               const SizedBox(height: 12),
               CustomTextField(
@@ -91,12 +98,15 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 label: 'Current Stock',
                 placeholder: 'e.g. 50',
                 keyboardType: TextInputType.number,
+                textInputAction: TextInputAction.next,
               ),
               const SizedBox(height: 12),
               CustomTextField(
                 controller: unitController,
                 label: 'Stock Unit',
                 placeholder: 'e.g. bottles / pcs',
+                textCapitalization: TextCapitalization.none,
+                textInputAction: TextInputAction.next,
               ),
               const SizedBox(height: 12),
               CustomTextField(
@@ -104,6 +114,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 label: 'Reorder Level Limit',
                 placeholder: 'e.g. 10',
                 keyboardType: TextInputType.number,
+                textInputAction: TextInputAction.done,
               ),
             ],
           ),
@@ -217,26 +228,32 @@ class _InventoryScreenState extends State<InventoryScreen> {
         onPressed: () => _showAddEditDialog(),
         child: const Icon(Icons.add),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFF006A61)))
-          : Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1200),
-                child: Column(
-                  children: [
-                    // Filter bar
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
-                      child: Column(
-                        children: [
-                          TextField(
-                            onChanged: (val) {
-                              setState(() {
-                                _searchQuery = val;
-                              });
-                            },
-                            style: GoogleFonts.inter(fontSize: 13),
-                            decoration: InputDecoration(
+      body: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(),
+        behavior: HitTestBehavior.translucent,
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator(color: Color(0xFF006A61)))
+            : Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1200),
+                  child: Column(
+                    children: [
+                      // Filter bar
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
+                        child: Column(
+                          children: [
+                            TextField(
+                              onChanged: (val) {
+                                setState(() {
+                                  _searchQuery = val;
+                                });
+                              },
+                              style: GoogleFonts.inter(fontSize: 13),
+                              textInputAction: TextInputAction.search,
+                              autocorrect: false,
+                              onSubmitted: (_) => FocusScope.of(context).unfocus(),
+                              decoration: InputDecoration(
                               hintText: 'Search inventory by name, category or SKU...',
                               hintStyle: GoogleFonts.inter(color: const Color(0x997C839B), fontSize: 13),
                               prefixIcon: const Icon(Icons.search, size: 20),
@@ -397,6 +414,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 ),
               ),
             ),
+      ),
     );
   }
 }
