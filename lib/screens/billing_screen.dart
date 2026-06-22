@@ -44,6 +44,9 @@ class _BillingScreenState extends State<BillingScreen> {
 
   final _promoController = TextEditingController();
 
+  bool _sendWhatsApp = true;
+  bool _printReceipt = false;
+
   @override
   void initState() {
     super.initState();
@@ -1041,7 +1044,116 @@ class _BillingScreenState extends State<BillingScreen> {
           _buildPaymentBtn(billingProvider, 'Card', '💳'),
         ],
       ),
-      const SizedBox(height: 16), // Shrank from 24
+      const SizedBox(height: 14),
+
+      // Delivery Options Checkboxes
+      Text(
+        'DELIVERY METHOD',
+        style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFF7C839B), letterSpacing: 1.0),
+      ),
+      const SizedBox(height: 6),
+      Row(
+        children: [
+          Expanded(
+            child: InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: () {
+                setState(() {
+                  _sendWhatsApp = !_sendWhatsApp;
+                });
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+                decoration: BoxDecoration(
+                  color: _sendWhatsApp ? const Color(0xFFE8F5E9) : Colors.white,
+                  border: Border.all(
+                    color: _sendWhatsApp ? const Color(0xFF4CAF50) : const Color(0xFFE2E8F0),
+                    width: _sendWhatsApp ? 1.5 : 1.0,
+                  ),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: Checkbox(
+                        value: _sendWhatsApp,
+                        activeColor: const Color(0xFF4CAF50),
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        onChanged: (val) {
+                          setState(() {
+                            _sendWhatsApp = val ?? false;
+                          });
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'WhatsApp',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: _sendWhatsApp ? const Color(0xFF2E7D32) : const Color(0xFF45464D),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: () {
+                setState(() {
+                  _printReceipt = !_printReceipt;
+                });
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+                decoration: BoxDecoration(
+                  color: _printReceipt ? const Color(0xFFE0F2F1) : Colors.white,
+                  border: Border.all(
+                    color: _printReceipt ? const Color(0xFF009688) : const Color(0xFFE2E8F0),
+                    width: _printReceipt ? 1.5 : 1.0,
+                  ),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: Checkbox(
+                        value: _printReceipt,
+                        activeColor: const Color(0xFF009688),
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        onChanged: (val) {
+                          setState(() {
+                            _printReceipt = val ?? false;
+                          });
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Print Receipt',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: _printReceipt ? const Color(0xFF00796B) : const Color(0xFF45464D),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+      const SizedBox(height: 16),
  
       // Checkout Submit Button
       ElevatedButton.icon(
@@ -1054,7 +1166,13 @@ class _BillingScreenState extends State<BillingScreen> {
         onPressed: billingProvider.cart.isEmpty ? null : () => _performCheckout(billingProvider, currentSelectedCustomer),
         icon: const Icon(Icons.send),
         label: Text(
-          'Generate & WhatsApp Invoice',
+          _sendWhatsApp && _printReceipt
+              ? 'Generate, Print & WhatsApp'
+              : _sendWhatsApp
+                  ? 'Generate & WhatsApp Invoice'
+                  : _printReceipt
+                      ? 'Generate & Print Invoice'
+                      : 'Generate Invoice Only',
           style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 14),
         ),
       ),
@@ -1277,114 +1395,52 @@ class _BillingScreenState extends State<BillingScreen> {
         Navigator.of(context).pop();
       }
 
-      // Show success modal dialog
+      // Print logic if checked
+      bool printSuccess = true;
+      String? printErrorMessage;
+      
+      if (_printReceipt) {
+        final printerProvider = Provider.of<BluetoothPrinterProvider>(context, listen: false);
+        if (printerProvider.connectionState == PrinterConnectionState.connected) {
+          printSuccess = await printerProvider.printBill(bill, businessName: bill.branchName ?? 'SmartBill Pro');
+          printErrorMessage = printerProvider.errorMessage;
+        } else {
+          // Attempt auto connect
+          final success = await printerProvider.autoDetectAndConnect();
+          if (success) {
+            printSuccess = await printerProvider.printBill(bill, businessName: bill.branchName ?? 'SmartBill Pro');
+            printErrorMessage = printerProvider.errorMessage;
+          } else {
+            printSuccess = false;
+            printErrorMessage = printerProvider.errorMessage ?? "No paired Bluetooth billing printer found.";
+          }
+        }
+      }
+
       if (!mounted) return;
-      showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Column(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: const BoxDecoration(color: Color(0xFFE6F4EA), shape: BoxShape.circle),
-                child: const Icon(Icons.check_circle, color: Color(0xFF1E8E3E), size: 28),
-              ),
-              const SizedBox(height: 12),
-              Text('Bill Compiled!', style: GoogleFonts.outfit(fontWeight: FontWeight.w900, fontSize: 18)),
-            ],
+
+      // Build the feedback message
+      String message = 'Invoice ${bill.billNumber} compiled successfully.';
+      if (_sendWhatsApp && _printReceipt) {
+        message = 'Invoice ${bill.billNumber} compiled! Queued for WhatsApp & ' + (printSuccess ? 'sent to printer.' : 'printer error: $printErrorMessage');
+      } else if (_sendWhatsApp) {
+        message = 'Invoice ${bill.billNumber} compiled & queued for WhatsApp delivery.';
+      } else if (_printReceipt) {
+        message = 'Invoice ${bill.billNumber} compiled & ' + (printSuccess ? 'sent to printer.' : 'printer error: $printErrorMessage');
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            message,
+            style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13),
           ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                'Invoice ${bill.billNumber} has been generated successfully and queued for secure WhatsApp deliverability.',
-                textAlign: TextAlign.center,
-                style: GoogleFonts.inter(color: const Color(0xFF7C839B), fontSize: 11),
-              ),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF8F9FF),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                ),
-                child: Column(
-                  children: [
-                    _buildPopupRow('Client Name', bill.customerName ?? ''),
-                    _buildPopupRow('Payment Gateway', '${bill.paymentMethod} Payment'),
-                    _buildPopupRow('Discount Code', bill.discountCode ?? 'None'),
-                    const SizedBox(height: 8),
-                    const DashedDivider(height: 1, color: Color(0xFFCBD5E1)),
-                    const SizedBox(height: 8),
-                    _buildPopupRow('Total Amount', '₹${NumberFormat('#,##,###').format(bill.totalAmount)}', isTotal: true),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            OutlinedButton(
-              style: OutlinedButton.styleFrom(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-              onPressed: () async {
-                Navigator.pop(ctx);
-                final printerProvider = Provider.of<BluetoothPrinterProvider>(context, listen: false);
-                if (printerProvider.connectionState == PrinterConnectionState.connected) {
-                  final receiptText = printerProvider.formatReceipt(bill, businessName: bill.branchName ?? 'SmartBill Pro');
-                  _showReceiptPreviewDialog(context, bill, receiptText);
-                } else {
-                  // Show loading and auto connect in the background
-                  showDialog(
-                    context: context,
-                    barrierDismissible: false,
-                    builder: (loadingCtx) => const AlertDialog(
-                      content: Row(
-                        children: [
-                          CircularProgressIndicator(color: Color(0xFF006A61)),
-                          SizedBox(width: 20),
-                          Text('Connecting to printer...'),
-                        ],
-                      ),
-                    ),
-                  );
-                  final success = await printerProvider.autoDetectAndConnect();
-                  if (mounted) {
-                    Navigator.pop(context); // Close loading dialog
-                  }
-                  if (success) {
-                    final receiptText = printerProvider.formatReceipt(bill, businessName: bill.branchName ?? 'SmartBill Pro');
-                    if (mounted) {
-                      _showReceiptPreviewDialog(context, bill, receiptText);
-                    }
-                  } else {
-                    if (mounted) {
-                      _showNoPrinterDialog(context, bill);
-                    }
-                  }
-                }
-              },
-              child: Text('Print Receipt', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF006A61),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-              onPressed: () {
-                Navigator.pop(ctx);
-              },
-              child: Text('Done', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
-            ),
-          ],
+          backgroundColor: printSuccess ? const Color(0xFF006A61) : const Color(0xFFBA1A1A),
+          duration: const Duration(seconds: 4),
         ),
       );
     } catch (e) {
+      if (!mounted) return;
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(

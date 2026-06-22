@@ -20,14 +20,14 @@ class ApiClient {
     
     // Automatically migrate old default/localhost URLs to the new ngrok URL
     if (saved != null && (saved.contains('localhost') || saved.contains('192.168.'))) {
-      saved = 'https://4265-2401-4900-882d-e15c-39ba-a63b-944e-b565.ngrok-free.app/api';
+      saved = 'https://test.iamyourdad.site/api';
       await prefs.setString(keyBaseUrl, saved);
     }
 
     if (saved != null && saved.isNotEmpty) {
       return saved;
     }
-    return 'https://4265-2401-4900-882d-e15c-39ba-a63b-944e-b565.ngrok-free.app/api';
+    return 'https://test.iamyourdad.site/api';
   }
 
   Future<void> setBaseUrl(String url) async {
