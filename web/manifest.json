@@ -1,6 +1,6 @@
 {
-    "name": "billing_mobile",
-    "short_name": "billing_mobile",
+    "name": "BillCom",
+    "short_name": "BillCom",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

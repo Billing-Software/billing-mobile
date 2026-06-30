@@ -40,6 +40,7 @@ class BillItem {
 
 class Bill {
   final int id;
+  final int customerId;
   final String billNumber;
   final double subtotal;
   final String? discountCode;
@@ -57,6 +58,7 @@ class Bill {
 
   Bill({
     required this.id,
+    required this.customerId,
     required this.billNumber,
     required this.subtotal,
     this.discountCode,
@@ -81,6 +83,7 @@ class Bill {
 
     return Bill(
       id: json['id'] ?? 0,
+      customerId: json['customerId'] ?? 0,
       billNumber: json['billNumber'] ?? '',
       subtotal: (json['subtotal'] as num?)?.toDouble() ?? 0.0,
       discountCode: json['discountCode'],
@@ -101,6 +104,7 @@ class Bill {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      'customerId': customerId,
       'billNumber': billNumber,
       'subtotal': subtotal,
       'discountCode': discountCode,

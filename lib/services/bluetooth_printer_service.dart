@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart' as native_bt;
 import '../models/bill.dart';
+import '../models/business.dart';
 
 enum PrinterConnectionState {
   disconnected,
@@ -92,13 +93,13 @@ class BluetoothPrinterService {
     }
   }
 
-  Future<void> printReceipt(Bill bill, {String businessName = 'SmartBill Pro'}) async {
+  Future<void> printReceipt(Bill bill, {String businessName = 'BillCom', Business? business}) async {
     final bool isConnected = await native_bt.PrintBluetoothThermal.connectionStatus;
     if (!isConnected) {
       throw Exception("Printer is not connected. Connect in settings first.");
     }
 
-    final receiptText = formatReceipt(bill, businessName: businessName);
+    final receiptText = formatReceipt(bill, businessName: businessName, business: business);
     
     final bool success = await native_bt.PrintBluetoothThermal.writeString(
       printText: native_bt.PrintTextSize(
@@ -111,9 +112,11 @@ class BluetoothPrinterService {
     }
   }
 
-  String formatReceipt(Bill bill, {String businessName = 'SmartBill Pro'}) {
+  String formatReceipt(Bill bill, {String businessName = 'BillCom', Business? business}) {
     final buffer = StringBuffer();
-    const int width = 32;
+    final int width = (business?.receiptTemplateType == 'Thermal58mm') ? 30 : 42;
+    final divider = '-' * width;
+    final doubleDivider = '=' * width;
 
     String centerText(String text) {
       if (text.length >= width) return text.substring(0, width);
@@ -129,13 +132,44 @@ class BluetoothPrinterService {
       return left + ' ' * spaceNeeded + right;
     }
 
-    buffer.writeln('================================');
-    buffer.writeln(centerText(businessName.toUpperCase()));
-    buffer.writeln(centerText('POS TERMINAL RECEIPT'));
-    if (bill.branchName != null && bill.branchName!.isNotEmpty) {
-      buffer.writeln(centerText(bill.branchName!));
+    buffer.writeln(doubleDivider);
+    
+    // Shop Name (Business Name)
+    final activeBusiness = business;
+    final String? tName = activeBusiness?.tradingName;
+    final String lName = activeBusiness?.legalName ?? '';
+    
+    final String shopName = (tName != null && tName.trim().isNotEmpty)
+        ? tName.trim()
+        : (lName.trim().isNotEmpty)
+            ? lName.trim()
+            : 'SHOP RECEIPT';
+            
+    buffer.writeln(centerText(shopName.toUpperCase()));
+    
+    // Receipt Header (e.g. welcome message)
+    if (business?.receiptHeader != null && business!.receiptHeader!.trim().isNotEmpty) {
+      buffer.writeln(centerText(business.receiptHeader!.trim()));
+      buffer.writeln(divider);
     }
-    buffer.writeln('================================');
+    
+    buffer.writeln(centerText('POS TERMINAL RECEIPT'));
+    
+    // Branch Name (if different from shop name)
+    if (bill.branchName != null && 
+        bill.branchName!.isNotEmpty && 
+        bill.branchName!.toLowerCase() != 'billcom' &&
+        bill.branchName!.toLowerCase() != shopName.toLowerCase()) {
+      buffer.writeln(centerText('Branch: ${bill.branchName}'));
+    }
+    buffer.writeln(doubleDivider);
+    
+    // Brand Logo Indicator if selected
+    if (business?.showLogoOnReceipt == true && business?.logoUrl != null && business!.logoUrl!.trim().isNotEmpty) {
+      buffer.writeln(centerText('[ Logo: ${business.logoUrl!.trim().split("/").last} ]'));
+      buffer.writeln(divider);
+    }
+
     buffer.writeln('Invoice: ${bill.billNumber}');
     buffer.writeln('Date: ${bill.createdAt.replaceAll('T', ' ').substring(0, 19)}');
     if (bill.customerName != null) {
@@ -144,13 +178,13 @@ class BluetoothPrinterService {
     if (bill.staffName != null) {
       buffer.writeln('Operator: ${bill.staffName}');
     }
-    buffer.writeln('--------------------------------');
+    buffer.writeln(divider);
     buffer.writeln(justifyText('Item (Qty x Price)', 'Total'));
-    buffer.writeln('--------------------------------');
+    buffer.writeln(divider);
 
     for (final item in bill.items) {
       final String itemLabel = '${item.serviceName} (${item.quantity}x${item.unitPrice.toStringAsFixed(0)})';
-      final String priceLabel = '₹${item.lineTotal.toStringAsFixed(0)}';
+      final String priceLabel = 'Rs. ${item.lineTotal.toStringAsFixed(0)}';
       
       if (itemLabel.length + priceLabel.length + 1 > width) {
         buffer.writeln(itemLabel);
@@ -160,24 +194,38 @@ class BluetoothPrinterService {
       }
     }
 
-    buffer.writeln('--------------------------------');
-    buffer.writeln(justifyText('Subtotal:', '₹${bill.subtotal.toStringAsFixed(0)}'));
+    buffer.writeln(divider);
+    buffer.writeln(justifyText('Subtotal:', 'Rs. ${bill.subtotal.toStringAsFixed(0)}'));
     
     if (bill.discountAmount > 0) {
       final discountLabel = 'Discount (${bill.discountCode ?? 'Code'}):';
-      buffer.writeln(justifyText(discountLabel, '-₹${bill.discountAmount.toStringAsFixed(0)}'));
+      buffer.writeln(justifyText(discountLabel, '-Rs. ${bill.discountAmount.toStringAsFixed(0)}'));
     }
     
-    buffer.writeln(justifyText('Tax (5% CGST/SGST):', '₹${bill.taxAmount.toStringAsFixed(0)}'));
-    buffer.writeln('================================');
-    buffer.writeln(justifyText('GRAND TOTAL:', '₹${bill.totalAmount.toStringAsFixed(0)}'));
-    buffer.writeln('================================');
+    buffer.writeln(justifyText('Tax Amount:', 'Rs. ${bill.taxAmount.toStringAsFixed(0)}'));
+    buffer.writeln(doubleDivider);
+    buffer.writeln(justifyText('GRAND TOTAL:', 'Rs. ${bill.totalAmount.toStringAsFixed(0)}'));
+    buffer.writeln(doubleDivider);
     buffer.writeln('Payment Mode: ${bill.paymentMethod.toUpperCase()}');
     buffer.writeln('Bill Status: ${bill.status.toUpperCase()}');
-    buffer.writeln('================================');
-    buffer.writeln(centerText('Thank you for your business!'));
-    buffer.writeln(centerText('Powering Smart POS Retail'));
-    buffer.writeln('================================');
+    buffer.writeln(doubleDivider);
+
+    // Receipt Footer
+    if (business?.receiptFooter != null && business!.receiptFooter!.trim().isNotEmpty) {
+      buffer.writeln(centerText(business.receiptFooter!.trim()));
+    } else {
+      buffer.writeln(centerText('Thank you for your business!'));
+    }
+    
+    buffer.writeln(divider);
+    buffer.writeln(centerText('Powered by BillCom'));
+    buffer.writeln(doubleDivider);
+    
+    // Add extra line feeds at the end to prevent the text from getting cut off when tearing the paper
+    buffer.writeln();
+    buffer.writeln();
+    buffer.writeln();
+    buffer.writeln();
 
     return buffer.toString();
   }

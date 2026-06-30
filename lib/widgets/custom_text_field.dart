@@ -19,6 +19,7 @@ class CustomTextField extends StatefulWidget {
   final bool autocorrect;
   final bool enableSuggestions;
   final ValueChanged<String>? onFieldSubmitted;
+  final bool readOnly;
 
   const CustomTextField({
     Key? key,
@@ -39,6 +40,7 @@ class CustomTextField extends StatefulWidget {
     this.autocorrect = true,
     this.enableSuggestions = true,
     this.onFieldSubmitted,
+    this.readOnly = false,
   }) : super(key: key);
 
   @override
@@ -60,12 +62,11 @@ class _CustomTextFieldState extends State<CustomTextField> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          widget.label.toUpperCase(),
+          widget.label,
           style: GoogleFonts.inter(
-            color: const Color(0xFF7C839B),
-            fontSize: 10,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1.2,
+            color: const Color(0xFF374151),
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
           ),
         ),
         const SizedBox(height: 6),
@@ -82,28 +83,29 @@ class _CustomTextFieldState extends State<CustomTextField> {
           autocorrect: widget.autocorrect,
           enableSuggestions: widget.enableSuggestions,
           onFieldSubmitted: widget.onFieldSubmitted,
+          readOnly: widget.readOnly,
           style: GoogleFonts.inter(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: const Color(0xFF0B1C30),
+            fontSize: 15,
+            fontWeight: FontWeight.w500,
+            color: const Color(0xFF1A1C1E),
           ),
           decoration: InputDecoration(
             hintText: widget.placeholder,
             hintStyle: GoogleFonts.inter(
-              color: const Color(0x997C839B),
+              color: const Color(0xFFADB5BD),
               fontSize: 14,
-              fontWeight: FontWeight.normal,
+              fontWeight: FontWeight.w400,
             ),
             isDense: widget.isDense,
-            prefixIcon: widget.prefixIcon != null 
-                ? Icon(widget.prefixIcon, color: const Color(0xFF7C839B), size: 18) 
+            prefixIcon: widget.prefixIcon != null
+                ? Icon(widget.prefixIcon, color: const Color(0xFF6B7280), size: 20)
                 : null,
             suffixIcon: widget.suffixIcon ?? (widget.obscureText
                 ? IconButton(
                     icon: Icon(
-                      _obscured ? Icons.visibility_off : Icons.visibility,
-                      color: const Color(0xFF7C839B),
-                      size: 18,
+                      _obscured ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+                      color: const Color(0xFF6B7280),
+                      size: 20,
                     ),
                     onPressed: () {
                       setState(() {
@@ -113,23 +115,23 @@ class _CustomTextFieldState extends State<CustomTextField> {
                   )
                 : null),
             filled: true,
-            fillColor: Colors.white,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            fillColor: widget.readOnly ? const Color(0xFFF3F4F6) : Colors.white,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             enabledBorder: OutlineInputBorder(
-              borderSide: const BorderSide(color: Color(0xFFC6C6CD), width: 1.0),
-              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Color(0xFFE5E7EB), width: 1.0),
+              borderRadius: BorderRadius.circular(12),
             ),
             focusedBorder: OutlineInputBorder(
               borderSide: const BorderSide(color: Color(0xFF006A61), width: 1.5),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(12),
             ),
             errorBorder: OutlineInputBorder(
-              borderSide: const BorderSide(color: Color(0xFFBA1A1A), width: 1.0),
-              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Color(0xFFDC2626), width: 1.0),
+              borderRadius: BorderRadius.circular(12),
             ),
             focusedErrorBorder: OutlineInputBorder(
-              borderSide: const BorderSide(color: Color(0xFFBA1A1A), width: 1.5),
-              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Color(0xFFDC2626), width: 1.5),
+              borderRadius: BorderRadius.circular(12),
             ),
           ),
         ),
@@ -137,4 +139,3 @@ class _CustomTextFieldState extends State<CustomTextField> {
     );
   }
 }
-

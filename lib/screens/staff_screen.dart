@@ -3,8 +3,9 @@ import 'package:intl/intl.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/staff.dart';
 import '../services/staff_service.dart';
-import '../widgets/sidebar_drawer.dart';
 import '../widgets/custom_text_field.dart';
+import '../widgets/confirm_sheet.dart';
+import '../widgets/custom_dropdown_field.dart';
 
 class StaffScreen extends StatefulWidget {
   const StaffScreen({Key? key}) : super(key: key);
@@ -18,6 +19,16 @@ class _StaffScreenState extends State<StaffScreen> {
   List<StaffMember> _staff = [];
   bool _isLoading = true;
   String _searchQuery = '';
+
+  List<StaffMember> _filteredStaff = [];
+
+  void _updateFilteredData() {
+    _filteredStaff = _staff.where((s) {
+      return s.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+          s.empCode.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+          s.role.toLowerCase().contains(_searchQuery.toLowerCase());
+    }).toList();
+  }
 
   @override
   void initState() {
@@ -36,6 +47,7 @@ class _StaffScreenState extends State<StaffScreen> {
       setState(() {
         _staff = list;
         _isLoading = false;
+        _updateFilteredData();
       });
     } catch (e) {
       if (!mounted) return;
@@ -48,38 +60,8 @@ class _StaffScreenState extends State<StaffScreen> {
     }
   }
 
-  Widget _buildDropdownField({
-    required String label,
-    required Widget child,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label.toUpperCase(),
-          style: GoogleFonts.inter(
-            color: const Color(0xFF7C839B),
-            fontSize: 10,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1.2,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border.all(color: const Color(0xFFC6C6CD), width: 1.0),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: DropdownButtonHideUnderline(child: child),
-        ),
-      ],
-    );
-  }
 
-  void _showAddEditDialog({StaffMember? member}) {
+  void _showAddEditBottomSheet({StaffMember? member}) {
     final isEdit = member != null;
     final nameController = TextEditingController(text: member?.name ?? '');
     final empCodeController = TextEditingController(text: member?.empCode ?? '');
@@ -87,138 +69,180 @@ class _StaffScreenState extends State<StaffScreen> {
     String role = member?.role ?? 'Specialist';
     String status = member?.status ?? 'Active';
 
-    showDialog(
+    showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(20),
+          topRight: Radius.circular(20),
+        ),
+      ),
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          title: Text(
-            isEdit ? 'Modify Personnel Details' : 'Onboard New Staff',
-            style: GoogleFonts.outfit(fontWeight: FontWeight.w900, fontSize: 16),
+        builder: (ctx, setBottomSheetState) => Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(ctx).viewInsets.bottom,
           ),
-          content: SingleChildScrollView(
+          child: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                CustomTextField(
-                  controller: nameController,
-                  label: 'Name',
-                  placeholder: 'e.g. David Miller',
-                  textCapitalization: TextCapitalization.words,
-                  textInputAction: TextInputAction.next,
-                  autofillHints: const [AutofillHints.name],
-                ),
-                const SizedBox(height: 12),
-                CustomTextField(
-                  controller: empCodeController,
-                  label: 'Employee Code',
-                  placeholder: 'e.g. SB-102',
-                  textCapitalization: TextCapitalization.characters,
-                  autocorrect: false,
-                  textInputAction: TextInputAction.next,
-                ),
-                const SizedBox(height: 12),
-                CustomTextField(
-                  controller: contactController,
-                  label: 'Contact Number',
-                  placeholder: 'e.g. 9876543210',
-                  keyboardType: TextInputType.phone,
-                  textInputAction: TextInputAction.done,
-                  autofillHints: const [AutofillHints.telephoneNumber],
-                ),
-                const SizedBox(height: 12),
-                _buildDropdownField(
-                  label: 'Role',
-                  child: DropdownButton<String>(
-                    value: role,
-                    isExpanded: true,
-                    onChanged: (val) {
-                      if (val != null) {
-                        setDialogState(() {
-                          role = val;
-                        });
-                      }
-                    },
-                    items: ['Manager', 'Specialist', 'Technician'].map((s) => DropdownMenuItem(value: s, child: Text(s, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600)))).toList(),
+                // Grab handle
+                Container(
+                  margin: const EdgeInsets.symmetric(vertical: 8),
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFC6C6CD),
+                    borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-                const SizedBox(height: 12),
-                _buildDropdownField(
-                  label: 'Status',
-                  child: DropdownButton<String>(
-                    value: status,
-                    isExpanded: true,
-                    onChanged: (val) {
-                      if (val != null) {
-                        setDialogState(() {
-                          status = val;
-                        });
-                      }
-                    },
-                    items: ['Active', 'Inactive'].map((s) => DropdownMenuItem(value: s, child: Text(s, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600)))).toList(),
+                // Title and close button
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        isEdit ? 'Modify Personnel Details' : 'Onboard New Staff',
+                        style: GoogleFonts.outfit(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 16,
+                          color: const Color(0xFF0B1C30),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    children: [
+                      CustomTextField(
+                        controller: nameController,
+                        label: 'Name',
+                        placeholder: 'e.g. David Miller',
+                        textCapitalization: TextCapitalization.words,
+                        textInputAction: TextInputAction.next,
+                        autofillHints: const [AutofillHints.name],
+                      ),
+                      const SizedBox(height: 12),
+                      CustomTextField(
+                        controller: empCodeController,
+                        label: 'Employee Code',
+                        placeholder: 'e.g. SB-102',
+                        textCapitalization: TextCapitalization.characters,
+                        autocorrect: false,
+                        textInputAction: TextInputAction.next,
+                      ),
+                      const SizedBox(height: 12),
+                      CustomTextField(
+                        controller: contactController,
+                        label: 'Contact Number',
+                        placeholder: 'e.g. 9876543210',
+                        keyboardType: TextInputType.phone,
+                        textInputAction: TextInputAction.done,
+                        autofillHints: const [AutofillHints.telephoneNumber],
+                      ),
+                      const SizedBox(height: 12),
+                      CustomDropdownField<String>(
+                        label: 'Role',
+                        value: role,
+                        items: const ['Manager', 'Specialist', 'Technician'],
+                        itemLabel: (s) => s,
+                        onChanged: (val) {
+                          if (val != null) {
+                            setBottomSheetState(() {
+                              role = val;
+                            });
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      CustomDropdownField<String>(
+                        label: 'Status',
+                        value: status,
+                        items: const ['Active', 'Inactive'],
+                        itemLabel: (s) => s,
+                        onChanged: (val) {
+                          if (val != null) {
+                            setBottomSheetState(() {
+                              status = val;
+                            });
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 20),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF006A61),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: () async {
+                          final name = nameController.text.trim();
+                          final empCode = empCodeController.text.trim();
+                          final contact = contactController.text.trim();
+
+                          if (name.isEmpty || empCode.isEmpty || contact.isEmpty) return;
+
+                          final payload = {
+                            'name': name,
+                            'empCode': empCode,
+                            'contact': contact,
+                            'role': role,
+                            'status': status,
+                          };
+
+                          try {
+                            if (isEdit) {
+                              await _staffService.update(member.id, payload);
+                            } else {
+                              await _staffService.create(payload);
+                            }
+                            if (ctx.mounted) {
+                              Navigator.pop(ctx);
+                            }
+                            _fetchStaff();
+                          } catch (e) {
+                            if (ctx.mounted) {
+                              ScaffoldMessenger.of(ctx).showSnackBar(
+                                SnackBar(content: Text('Operation failed: $e')),
+                              );
+                            }
+                          }
+                        },
+                        child: Text(
+                          isEdit ? 'Save Changes' : 'Establish Profile',
+                          style: GoogleFonts.inter(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: Text('Cancel', style: GoogleFonts.inter(color: const Color(0xFF7C839B))),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF006A61), foregroundColor: Colors.white),
-              onPressed: () async {
-                final name = nameController.text.trim();
-                final empCode = empCodeController.text.trim();
-                final contact = contactController.text.trim();
-
-                if (name.isEmpty || empCode.isEmpty || contact.isEmpty) return;
-
-                final payload = {
-                  'name': name,
-                  'empCode': empCode,
-                  'contact': contact,
-                  'role': role,
-                  'status': status,
-                };
-
-                try {
-                  if (isEdit) {
-                    await _staffService.update(member.id, payload);
-                  } else {
-                    await _staffService.create(payload);
-                  }
-                  Navigator.pop(ctx);
-                  _fetchStaff();
-                } catch (e) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Operation failed: $e')),
-                  );
-                }
-              },
-              child: Text(isEdit ? 'Save Changes' : 'Establish Profile', style: GoogleFonts.inter()),
-            ),
-          ],
         ),
       ),
     );
   }
 
   Future<void> _deleteStaff(int id) async {
-    final confirm = await showDialog<bool>(
+    final confirm = await ConfirmSheet.show(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('Decommission Staff Profile?', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
-        content: Text('Are you sure you want to permanently remove this staff profile?', style: GoogleFonts.inter()),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Cancel', style: GoogleFonts.inter())),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFBA1A1A), foregroundColor: Colors.white),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text('Remove', style: GoogleFonts.inter()),
-          ),
-        ],
-      ),
+      title: 'Decommission Staff Profile?',
+      message: 'Are you sure you want to permanently remove this staff profile?',
+      confirmText: 'Remove',
+      cancelText: 'Cancel',
+      isDestructive: true,
     );
 
     if (confirm == true) {
@@ -237,25 +261,18 @@ class _StaffScreenState extends State<StaffScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final filtered = _staff.where((s) {
-      return s.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-          s.empCode.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-          s.role.toLowerCase().contains(_searchQuery.toLowerCase());
-    }).toList();
+    final filtered = _filteredStaff;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FF),
       appBar: AppBar(
         title: Text('Staff Directory', style: GoogleFonts.outfit(fontWeight: FontWeight.w900)),
-        actions: [
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _fetchStaff),
-        ],
       ),
-      drawer: const SidebarDrawer(activeRoute: '/staff'),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'staff_fab',
         backgroundColor: const Color(0xFF006A61),
         foregroundColor: Colors.white,
-        onPressed: () => _showAddEditDialog(),
+        onPressed: () => _showAddEditBottomSheet(),
         child: const Icon(Icons.add),
       ),
       body: GestureDetector(
@@ -274,6 +291,7 @@ class _StaffScreenState extends State<StaffScreen> {
                           onChanged: (val) {
                             setState(() {
                               _searchQuery = val;
+                              _updateFilteredData();
                             });
                           },
                           style: GoogleFonts.inter(fontSize: 13),
@@ -341,6 +359,8 @@ class _StaffScreenState extends State<StaffScreen> {
                                               Expanded(
                                                 child: Text(
                                                   member.name,
+                                                  overflow: TextOverflow.ellipsis,
+                                                  maxLines: 1,
                                                   style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: const Color(0xFF0B1C30), fontSize: 13),
                                                 ),
                                               ),
@@ -368,6 +388,7 @@ class _StaffScreenState extends State<StaffScreen> {
                                               Text('Employee Code: ${member.empCode} | Role: ${member.role}', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF45464D))),
                                               const SizedBox(height: 2),
                                               Text('Contact: ${member.contact}', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF7C839B))),
+
                                             ],
                                           ),
                                           trailing: Row(
@@ -377,7 +398,7 @@ class _StaffScreenState extends State<StaffScreen> {
                                                 padding: EdgeInsets.zero,
                                                 constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                                                 icon: const Icon(Icons.edit_outlined, color: Color(0xFF006A61), size: 18),
-                                                onPressed: () => _showAddEditDialog(member: member),
+                                                onPressed: () => _showAddEditBottomSheet(member: member),
                                               ),
                                               IconButton(
                                                 padding: EdgeInsets.zero,

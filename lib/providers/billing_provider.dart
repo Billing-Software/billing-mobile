@@ -13,6 +13,10 @@ class BillingProvider extends ChangeNotifier {
   String _discountCode = '';
   String _activeDiscountCode = 'VIP10';
   double _activeDiscountPercent = 10.0;
+
+  String _discountType = 'percentage'; // 'percentage' | 'flat'
+  double _discountValue = 0.0;
+
   String _paymentMethod = 'Cash';
 
   List<BillItem> get cart => _cart;
@@ -21,6 +25,8 @@ class BillingProvider extends ChangeNotifier {
   String get discountCode => _discountCode;
   String get activeDiscountCode => _activeDiscountCode;
   double get activeDiscountPercent => _activeDiscountPercent;
+  String get discountType => _discountType;
+  double get discountValue => _discountValue;
   String get paymentMethod => _paymentMethod;
 
   void selectBranch(int? id) {
@@ -41,6 +47,34 @@ class BillingProvider extends ChangeNotifier {
   void setDiscountCodeText(String code) {
     _discountCode = code;
     notifyListeners();
+  }
+
+  void setDiscount(String type, double value) {
+    _discountType = type;
+    _discountValue = value;
+    if (_discountType == 'percentage') {
+      _activeDiscountPercent = _discountValue;
+      _activeDiscountCode = _discountValue > 0 ? 'CUSTOM-${_discountValue.toStringAsFixed(0)}%' : 'NONE';
+    } else {
+      _activeDiscountPercent = 0.0;
+      _activeDiscountCode = _discountValue > 0 ? 'FLAT ₹${_discountValue.toStringAsFixed(0)}' : 'NONE';
+    }
+    notifyListeners();
+  }
+
+  void updateUnitPrice(int serviceId, double newPrice) {
+    int index = _cart.indexWhere((item) => item.serviceId == serviceId);
+    if (index != -1) {
+      final old = _cart[index];
+      _cart[index] = BillItem(
+        serviceId: old.serviceId,
+        serviceName: old.serviceName,
+        unitPrice: newPrice,
+        quantity: old.quantity,
+        lineTotal: old.quantity * newPrice,
+      );
+      notifyListeners();
+    }
   }
 
   void addService(Service service) {
@@ -95,16 +129,24 @@ class BillingProvider extends ChangeNotifier {
   void clearCart() {
     _cart.clear();
     _discountCode = '';
-    _activeDiscountCode = 'VIP10';
-    _activeDiscountPercent = 10.0;
+    _activeDiscountCode = 'NONE';
+    _activeDiscountPercent = 0.0;
+    _discountType = 'percentage';
+    _discountValue = 0.0;
     _paymentMethod = 'Cash';
     notifyListeners();
   }
 
   // Calculations
   double get subtotal => _cart.fold(0.0, (sum, item) => sum + item.lineTotal);
-  double get discountAmount => subtotal * (_activeDiscountPercent / 100.0);
-  double get taxAmount => (subtotal - discountAmount) * 0.05; // 5% Flat CGST/SGST proxy
+  double get discountAmount {
+    if (_discountType == 'percentage') {
+      return subtotal * (_discountValue / 100.0);
+    } else {
+      return _discountValue;
+    }
+  }
+  double get taxAmount => 0.0;
   double get totalAmount => subtotal - discountAmount + taxAmount < 0.0 ? 0.0 : subtotal - discountAmount + taxAmount;
 
   String applyPromo(String code) {
@@ -141,6 +183,7 @@ class BillingProvider extends ChangeNotifier {
     required int customerId,
     required String customerName,
     required String customerPhone,
+    int? createdByStaffId,
   }) async {
     if (_cart.isEmpty) {
       throw Exception("Please add services to the current bill first!");
@@ -151,10 +194,10 @@ class BillingProvider extends ChangeNotifier {
     final payload = {
       'branchId': branchId,
       'customerId': customerId,
-      'createdByStaffId': null,
+      'createdByStaffId': createdByStaffId,
       'billNumber': billNumber,
       'subtotal': subtotal,
-      'discountCode': _activeDiscountPercent > 0 ? _activeDiscountCode : null,
+      'discountCode': _discountValue > 0 ? _activeDiscountCode : null,
       'discountAmount': discountAmount,
       'taxAmount': taxAmount,
       'totalAmount': totalAmount,
@@ -174,6 +217,7 @@ class BillingProvider extends ChangeNotifier {
     // Construct local Bill with correct Names for HUD/popup rendering
     final mappedBill = Bill(
       id: createdBill.id,
+      customerId: customerId,
       billNumber: createdBill.billNumber,
       subtotal: createdBill.subtotal,
       discountCode: createdBill.discountCode,
@@ -190,5 +234,12 @@ class BillingProvider extends ChangeNotifier {
 
     clearCart();
     return mappedBill;
+  }
+
+  int _refreshTrigger = 0;
+  int get refreshTrigger => _refreshTrigger;
+  void triggerRefresh() {
+    _refreshTrigger++;
+    notifyListeners();
   }
 }

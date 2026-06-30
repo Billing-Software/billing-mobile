@@ -15,6 +15,10 @@ class Business {
   final String? gstIn;
   final double defaultTaxRate;
   final bool pricesIncludeTax;
+  final String? receiptHeader;
+  final String? receiptFooter;
+  final bool showLogoOnReceipt;
+  final String receiptTemplateType;
 
   Business({
     required this.id,
@@ -33,26 +37,34 @@ class Business {
     this.gstIn,
     required this.defaultTaxRate,
     required this.pricesIncludeTax,
+    this.receiptHeader,
+    this.receiptFooter,
+    this.showLogoOnReceipt = true,
+    this.receiptTemplateType = 'Thermal80mm',
   });
 
   factory Business.fromJson(Map<String, dynamic> json) {
     return Business(
-      id: json['id'] ?? 0,
-      ownerId: json['ownerId'] ?? 0,
-      legalName: json['legalName'] ?? '',
-      tradingName: json['tradingName'],
-      logoUrl: json['logoUrl'],
-      address: json['address'],
-      city: json['city'],
-      state: json['state'],
-      postalCode: json['postalCode'],
-      country: json['country'],
-      phone: json['phone'],
-      email: json['email'],
-      website: json['website'],
-      gstIn: json['gstIn'],
-      defaultTaxRate: (json['defaultTaxRate'] as num?)?.toDouble() ?? 18.0,
-      pricesIncludeTax: json['pricesIncludeTax'] ?? true,
+      id: json['id'] ?? json['Id'] ?? 0,
+      ownerId: json['ownerId'] ?? json['OwnerId'] ?? 0,
+      legalName: json['legalName'] ?? json['LegalName'] ?? '',
+      tradingName: json['tradingName'] ?? json['TradingName'],
+      logoUrl: json['logoUrl'] ?? json['LogoUrl'],
+      address: json['address'] ?? json['Address'],
+      city: json['city'] ?? json['City'],
+      state: json['state'] ?? json['State'],
+      postalCode: json['postalCode'] ?? json['PostalCode'],
+      country: json['country'] ?? json['Country'],
+      phone: json['phone'] ?? json['Phone'],
+      email: json['email'] ?? json['Email'],
+      website: json['website'] ?? json['Website'],
+      gstIn: json['gstIn'] ?? json['GstIn'],
+      defaultTaxRate: ((json['defaultTaxRate'] ?? json['DefaultTaxRate']) as num?)?.toDouble() ?? 18.0,
+      pricesIncludeTax: json['pricesIncludeTax'] ?? json['PricesIncludeTax'] ?? true,
+      receiptHeader: json['receiptHeader'] ?? json['ReceiptHeader'],
+      receiptFooter: json['receiptFooter'] ?? json['ReceiptFooter'],
+      showLogoOnReceipt: json['showLogoOnReceipt'] ?? json['ShowLogoOnReceipt'] ?? true,
+      receiptTemplateType: json['receiptTemplateType'] ?? json['ReceiptTemplateType'] ?? 'Thermal80mm',
     );
   }
 
@@ -74,6 +86,10 @@ class Business {
       'gstIn': gstIn,
       'defaultTaxRate': defaultTaxRate,
       'pricesIncludeTax': pricesIncludeTax,
+      'receiptHeader': receiptHeader,
+      'receiptFooter': receiptFooter,
+      'showLogoOnReceipt': showLogoOnReceipt,
+      'receiptTemplateType': receiptTemplateType,
     };
   }
 }

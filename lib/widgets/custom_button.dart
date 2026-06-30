@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+enum CustomButtonVariant { filled, outline, text }
+
 class CustomButton extends StatelessWidget {
   final String text;
   final VoidCallback onPressed;
@@ -8,6 +10,8 @@ class CustomButton extends StatelessWidget {
   final Color? color;
   final Color? textColor;
   final IconData? icon;
+  final CustomButtonVariant variant;
+  final bool fullWidth;
 
   const CustomButton({
     Key? key,
@@ -17,58 +21,89 @@ class CustomButton extends StatelessWidget {
     this.color,
     this.textColor,
     this.icon,
+    this.variant = CustomButtonVariant.filled,
+    this.fullWidth = true,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    final buttonColor = color ?? const Color(0xFF006A61);
-    final textCol = textColor ?? Colors.white;
+    final primaryColor = color ?? const Color(0xFF006A61);
+    final foreground = textColor ?? (variant == CustomButtonVariant.filled ? Colors.white : primaryColor);
 
-    return SizedBox(
-      height: 44,
-      child: ElevatedButton(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: buttonColor,
-          foregroundColor: textCol,
-          elevation: 1,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-        ),
-        onPressed: isLoading ? null : onPressed,
-        child: isLoading
-            ? const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                ),
-              )
-            : Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (icon != null) ...[
-                    Icon(icon, size: 16),
-                    const SizedBox(width: 8),
-                  ],
-                  Flexible(
-                    child: Text(
-                      text,
-                      style: GoogleFonts.inter(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
-                    ),
+    Widget content = isLoading
+        ? SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              valueColor: AlwaysStoppedAnimation<Color>(foreground),
+            ),
+          )
+        : Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: fullWidth ? MainAxisSize.max : MainAxisSize.min,
+            children: [
+              if (icon != null) ...[
+                Icon(icon, size: 18),
+                const SizedBox(width: 8),
+              ],
+              Flexible(
+                child: Text(
+                  text,
+                  style: GoogleFonts.inter(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
                   ),
-                ],
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                ),
               ),
-      ),
+            ],
+          );
+
+    final shape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(12),
     );
+
+    final minSize = Size(fullWidth ? double.infinity : 0, 48);
+
+    switch (variant) {
+      case CustomButtonVariant.outline:
+        return OutlinedButton(
+          style: OutlinedButton.styleFrom(
+            foregroundColor: foreground,
+            side: BorderSide(color: primaryColor.withValues(alpha: 0.3)),
+            shape: shape,
+            minimumSize: minSize,
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+          ),
+          onPressed: isLoading ? null : onPressed,
+          child: content,
+        );
+      case CustomButtonVariant.text:
+        return TextButton(
+          style: TextButton.styleFrom(
+            foregroundColor: foreground,
+            shape: shape,
+            minimumSize: minSize,
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+          ),
+          onPressed: isLoading ? null : onPressed,
+          child: content,
+        );
+      case CustomButtonVariant.filled:
+        return ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: primaryColor,
+            foregroundColor: foreground,
+            elevation: 0,
+            shape: shape,
+            minimumSize: minSize,
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+          ),
+          onPressed: isLoading ? null : onPressed,
+          child: content,
+        );
+    }
   }
 }
-

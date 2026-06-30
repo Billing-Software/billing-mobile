@@ -43,21 +43,33 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<bool> login(String username, String password) async {
+  Future<bool> login(String email, String password, {int? businessId}) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
     try {
-      _currentUser = await _authService.login(username, password);
+      _currentUser = await _authService.login(email, password, businessId: businessId);
       _isLoading = false;
       notifyListeners();
       return true;
     } catch (e) {
-      _error = e.toString().replaceAll('Exception:', '').trim();
+      _error = e.toString().replaceFirst('Exception: ', '');
       _isLoading = false;
       notifyListeners();
       return false;
     }
+  }
+
+  Future<Map<String, dynamic>> forgotPassword(String email) async {
+    return await _authService.forgotPassword(email);
+  }
+
+  Future<void> resetPassword(String email, String token, String newPassword) async {
+    await _authService.resetPassword(email, token, newPassword);
+  }
+
+  Future<void> changePassword(String currentPassword, String newPassword) async {
+    await _authService.changePassword(currentPassword, newPassword);
   }
 
   Future<bool> register(Map<String, dynamic> registerData) async {

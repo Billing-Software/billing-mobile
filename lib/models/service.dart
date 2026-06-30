@@ -6,7 +6,7 @@ class Service {
   final double basePrice;
   final double taxRate;
   final String status; // 'Active' | 'Inactive'
-  final String iconName;
+  final String imageUrl;
 
   Service({
     required this.id,
@@ -16,7 +16,7 @@ class Service {
     required this.basePrice,
     required this.taxRate,
     required this.status,
-    required this.iconName,
+    required this.imageUrl,
   });
 
   factory Service.fromJson(Map<String, dynamic> json) {
@@ -28,7 +28,7 @@ class Service {
       basePrice: (json['basePrice'] as num?)?.toDouble() ?? 0.0,
       taxRate: (json['taxRate'] as num?)?.toDouble() ?? 0.0,
       status: json['status'] ?? 'Active',
-      iconName: json['iconName'] ?? '',
+      imageUrl: json['imageUrl'] ?? '',
     );
   }
 
@@ -41,7 +41,7 @@ class Service {
       'basePrice': basePrice,
       'taxRate': taxRate,
       'status': status,
-      'iconName': iconName,
+      'imageUrl': imageUrl,
     };
   }
 }

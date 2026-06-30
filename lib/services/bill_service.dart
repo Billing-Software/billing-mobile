@@ -5,8 +5,20 @@ import 'api_client.dart';
 class BillService {
   final ApiClient _client = ApiClient();
 
-  Future<List<Bill>> getAll() async {
-    final response = await _client.get('/bills');
+  Future<List<Bill>> getAll({Map<String, dynamic>? filters}) async {
+    String query = '';
+    if (filters != null && filters.isNotEmpty) {
+      final parts = <String>[];
+      filters.forEach((key, value) {
+        if (value != null) {
+          parts.add('$key=${Uri.encodeComponent(value.toString())}');
+        }
+      });
+      if (parts.isNotEmpty) {
+        query = '?' + parts.join('&');
+      }
+    }
+    final response = await _client.get('/bills$query');
     if (response.statusCode == 200) {
       final List jsonList = jsonDecode(response.body);
       return jsonList.map((j) => Bill.fromJson(j)).toList();

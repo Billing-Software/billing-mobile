@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../providers/auth_provider.dart';
+import '../screens/settings/about_page.dart';
 
 class SidebarDrawer extends StatelessWidget {
   final String activeRoute;
@@ -18,45 +19,33 @@ class SidebarDrawer extends StatelessWidget {
     required String routeName,
   }) {
     final isActive = activeRoute == routeName;
+
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
       decoration: BoxDecoration(
-        color: isActive ? const Color(0xFF86F2E4).withValues(alpha: 0.3) : Colors.transparent,
-        borderRadius: BorderRadius.circular(8),
+        color: isActive ? const Color(0xFFE8F5F3) : Colors.transparent,
+        borderRadius: BorderRadius.circular(10),
       ),
       child: ListTile(
         visualDensity: const VisualDensity(horizontal: 0, vertical: -2),
         leading: Icon(
           icon,
-          color: isActive ? const Color(0xFF006F66) : const Color(0xFF76777D),
-          size: 18,
+          color: isActive ? const Color(0xFF006A61) : const Color(0xFF6B7280),
+          size: 20,
         ),
         title: Text(
           title,
           style: GoogleFonts.inter(
-            color: isActive ? const Color(0xFF006F66) : const Color(0xFF45464D),
-            fontWeight: isActive ? FontWeight.bold : FontWeight.w600,
-            fontSize: 13,
+            color: isActive ? const Color(0xFF006A61) : const Color(0xFF374151),
+            fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
+            fontSize: 14,
           ),
         ),
         onTap: () {
-          Navigator.of(context).pop(); // Close drawer
-          if (title == 'Help Center') {
-            showDialog(
-              context: context,
-              builder: (ctx) => AlertDialog(
-                title: Text('Help Center', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
-                content: Text(
-                  'Need assistance? Access our online user guides or reach out directly to customer support at info@smartbill.com.',
-                  style: GoogleFonts.inter(),
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx),
-                    child: const Text('OK', style: TextStyle(color: Color(0xFF006A61), fontWeight: FontWeight.bold)),
-                  ),
-                ],
-              ),
+          Navigator.of(context).pop();
+          if (title == 'Help') {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const AboutPage()),
             );
             return;
           }
@@ -77,25 +66,25 @@ class SidebarDrawer extends StatelessWidget {
       backgroundColor: Colors.white,
       child: Column(
         children: [
-          // Custom Top Branding Area (No bulky DrawerHeader)
+          // Top branding
           SafeArea(
             bottom: false,
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
+              padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 20.0),
               child: Row(
                 children: [
                   Container(
-                    width: 40,
-                    height: 40,
+                    width: 38,
+                    height: 38,
                     decoration: BoxDecoration(
-                      color: Colors.black,
-                      borderRadius: BorderRadius.circular(8),
+                      color: const Color(0xFF1A1C1E),
+                      borderRadius: BorderRadius.circular(10),
                     ),
                     child: const Center(
                       child: Icon(
-                        Icons.terminal,
+                        Icons.receipt_long_rounded,
                         color: Color(0xFF86F2E4),
-                        size: 22,
+                        size: 20,
                       ),
                     ),
                   ),
@@ -105,20 +94,19 @@ class SidebarDrawer extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'SmartBill Pro',
-                          style: GoogleFonts.outfit(
+                          'BillCom',
+                          style: GoogleFonts.inter(
                             fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: const Color(0xFF0B1C30),
-                            letterSpacing: -0.3,
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFF1A1C1E),
                           ),
                         ),
                         Text(
-                          user?.businessName ?? 'Admin Terminal',
+                          user?.businessName ?? 'Admin',
                           style: GoogleFonts.inter(
-                            fontSize: 11,
-                            color: const Color(0xFF7C839B),
-                            fontWeight: FontWeight.w500,
+                            fontSize: 12,
+                            color: const Color(0xFF6B7280),
+                            fontWeight: FontWeight.w400,
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -130,86 +118,85 @@ class SidebarDrawer extends StatelessWidget {
             ),
           ),
 
-          // Quick Action Plus Button
+          // New Bill button
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
             child: SizedBox(
               width: double.infinity,
-              height: 38,
+              height: 44,
               child: ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF006A61),
                   foregroundColor: Colors.white,
                   elevation: 0,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
                 ),
                 onPressed: () {
-                  Navigator.of(context).pop(); // Close drawer
+                  Navigator.of(context).pop();
                   if (activeRoute != '/billing') {
                     Navigator.of(context).pushReplacementNamed('/billing');
                   }
                 },
-                icon: const Icon(Icons.add, size: 16),
+                icon: const Icon(Icons.add_rounded, size: 18),
                 label: Text(
                   'New Bill',
                   style: GoogleFonts.inter(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
                   ),
                 ),
               ),
             ),
           ),
 
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
 
-          // Menu Navigation Tabs
+          // Menu items
           Expanded(
             child: ListView(
               padding: EdgeInsets.zero,
               children: [
                 _buildMenuItem(
                   context: context,
-                  icon: Icons.dashboard_outlined,
+                  icon: Icons.grid_view_rounded,
                   title: 'Dashboard',
                   routeName: '/dashboard',
                 ),
                 _buildMenuItem(
                   context: context,
-                  icon: Icons.receipt_long_outlined,
+                  icon: Icons.receipt_long_rounded,
                   title: 'Billing',
                   routeName: '/billing',
                 ),
                 _buildMenuItem(
                   context: context,
-                  icon: Icons.people_outline,
-                  title: 'Customers',
-                  routeName: '/customers',
+                  icon: Icons.inventory_2_rounded,
+                  title: 'Catalog',
+                  routeName: '/catalog',
                 ),
                 _buildMenuItem(
                   context: context,
-                  icon: Icons.auto_awesome_outlined,
-                  title: 'Services',
-                  routeName: '/services',
+                  icon: Icons.receipt_long_outlined,
+                  title: 'Invoices',
+                  routeName: '/invoices',
                 ),
                 _buildMenuItem(
                   context: context,
-                  icon: Icons.inventory_2_outlined,
-                  title: 'Inventory',
-                  routeName: '/inventory',
+                  icon: Icons.account_balance_wallet_rounded,
+                  title: 'Expenses',
+                  routeName: '/expenses',
                 ),
                 _buildMenuItem(
                   context: context,
-                  icon: Icons.badge_outlined,
+                  icon: Icons.badge_rounded,
                   title: 'Staff',
                   routeName: '/staff',
                 ),
                 _buildMenuItem(
                   context: context,
-                  icon: Icons.settings_outlined,
+                  icon: Icons.settings_rounded,
                   title: 'Settings',
                   routeName: '/settings',
                 ),
@@ -217,12 +204,12 @@ class SidebarDrawer extends StatelessWidget {
             ),
           ),
 
-          // Help Center & Profile Footer
+          // Bottom section
           Container(
             padding: const EdgeInsets.only(top: 8, bottom: 16),
             decoration: const BoxDecoration(
               border: Border(
-                top: BorderSide(color: Color(0xFFE2E8F0)),
+                top: BorderSide(color: Color(0xFFF0F0F0)),
               ),
             ),
             child: Column(
@@ -230,28 +217,27 @@ class SidebarDrawer extends StatelessWidget {
               children: [
                 _buildMenuItem(
                   context: context,
-                  icon: Icons.help_outline,
-                  title: 'Help Center',
+                  icon: Icons.help_outline_rounded,
+                  title: 'Help',
                   routeName: '/help',
                 ),
                 const SizedBox(height: 8),
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  padding: const EdgeInsets.symmetric(horizontal: 20.0),
                   child: Row(
                     children: [
                       Container(
-                        width: 32,
-                        height: 32,
+                        width: 34,
+                        height: 34,
                         decoration: BoxDecoration(
-                          color: const Color(0xFFEFF4FF),
-                          shape: BoxShape.circle,
-                          border: Border.all(color: const Color(0xFFC6C6CD)),
+                          color: const Color(0xFFF3F4F6),
+                          borderRadius: BorderRadius.circular(8),
                         ),
                         child: const Center(
                           child: Icon(
-                            Icons.storefront,
-                            color: Color(0xFF006A61),
-                            size: 16,
+                            Icons.person_rounded,
+                            color: Color(0xFF6B7280),
+                            size: 18,
                           ),
                         ),
                       ),
@@ -263,17 +249,17 @@ class SidebarDrawer extends StatelessWidget {
                             Text(
                               user?.username ?? 'Employee',
                               style: GoogleFonts.inter(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: const Color(0xFF0B1C30),
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: const Color(0xFF1A1C1E),
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),
                             Text(
                               user?.role ?? 'Manager',
                               style: GoogleFonts.inter(
-                                fontSize: 10,
-                                color: const Color(0xFF45464D),
+                                fontSize: 11,
+                                color: const Color(0xFF6B7280),
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -282,13 +268,12 @@ class SidebarDrawer extends StatelessWidget {
                       ),
                       IconButton(
                         padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                        constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
                         icon: const Icon(
-                          Icons.logout,
-                          color: Color(0xFF76777D),
-                          size: 16,
+                          Icons.logout_rounded,
+                          color: Color(0xFF6B7280),
+                          size: 18,
                         ),
-                        hoverColor: const Color(0xFFFFDAD6).withValues(alpha: 0.4),
                         onPressed: () async {
                           await authProvider.logout();
                           if (context.mounted) {

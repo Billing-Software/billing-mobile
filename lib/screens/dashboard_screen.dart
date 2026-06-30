@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:intl/intl.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:intl/intl.dart';
 import '../providers/auth_provider.dart';
 import '../services/dashboard_service.dart';
-import '../widgets/sidebar_drawer.dart';
+import 'main_shell.dart';
+import '../widgets/custom_dropdown_field.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({Key? key}) : super(key: key);
@@ -134,45 +136,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
     final currentBranch = authProvider.currentBranch;
+    final isOwner = authProvider.currentUser?.role == 'Owner';
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FF),
       appBar: AppBar(
-        title: Text(
-          'SmartBill Pro',
-          style: GoogleFonts.outfit(fontWeight: FontWeight.w900, letterSpacing: -0.5),
+        title: SvgPicture.asset(
+          'assets/BillCom-text.svg',
+          height: 28,
+          fit: BoxFit.contain,
         ),
-        actions: [
-          // Branch selector dropdown
-          DropdownButton<String>(
-            value: currentBranch,
-            underline: Container(),
-            icon: const Icon(Icons.location_on, color: Color(0xFF006A61)),
-            onChanged: (String? val) {
-              if (val != null) {
-                authProvider.changeBranch(val);
-                _fetchData();
-              }
-            },
-            items: <String>['Main', 'Downtown'].map<DropdownMenuItem<String>>((String value) {
-              return DropdownMenuItem<String>(
-                value: value,
-                child: Text(
-                  '$value Branch',
-                  style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13),
-                ),
-              );
-            }).toList(),
-          ),
-          const SizedBox(width: 8),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _fetchData,
-          ),
-          const SizedBox(width: 8),
+        actions: const [
+          SizedBox(width: 8),
         ],
       ),
-      drawer: const SidebarDrawer(activeRoute: '/dashboard'),
       body: _isLoading
           ? Center(
               child: Column(
@@ -227,28 +204,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
                            Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Today\'s Overview',
-                                    style: GoogleFonts.outfit(
-                                      fontSize: 22,
-                                      fontWeight: FontWeight.w900,
-                                      color: const Color(0xFF0B1C30),
+                              Flexible(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      isOwner ? 'Today\'s Overview' : 'My Dashboard',
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 22,
+                                        fontWeight: FontWeight.w900,
+                                        color: const Color(0xFF0B1C30),
+                                      ),
                                     ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    'Live metrics for $currentBranch Branch',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 12,
-                                      color: const Color(0xFF45464D),
-                                      fontWeight: FontWeight.w500,
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      isOwner
+                                          ? 'Live metrics for $currentBranch Branch'
+                                          : 'Logged in as ${authProvider.currentUser?.role} - Shift Performance',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 12,
+                                        color: const Color(0xFF45464D),
+                                        fontWeight: FontWeight.w500,
+                                      ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
+                              const SizedBox(width: 8),
                               ElevatedButton(
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: const Color(0xFF006A61),
@@ -256,10 +238,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(8),
                                   ),
+                                  minimumSize: const Size(0, 36),
                                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                 ),
                                 onPressed: () {
-                                  Navigator.of(context).pushReplacementNamed('/billing');
+                                  final mainShell = context.findAncestorStateOfType<MainShellState>();
+                                  if (mainShell != null) {
+                                    mainShell.switchTab(2);
+                                  } else {
+                                    Navigator.of(context).pushReplacementNamed('/billing');
+                                  }
                                 },
                                 child: Text(
                                   'New Quick Bill',
@@ -268,7 +256,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               ),
                             ],
                           ),
-                          const SizedBox(height: 12), // Shrank from 16
+                          const SizedBox(height: 12),
 
                           // Bento Stats Row (Responsive Layout)
                           LayoutBuilder(
@@ -280,95 +268,122 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 crossAxisCount: crossAxisCount,
                                 shrinkWrap: true,
                                 physics: const NeverScrollableScrollPhysics(),
-                                crossAxisSpacing: 10, // Shrank from 12
-                                mainAxisSpacing: 10,  // Shrank from 12
+                                crossAxisSpacing: 10,
+                                mainAxisSpacing: 10,
                                 childAspectRatio: childAspectRatio,
                                 children: [
                                   _buildMetricsCard(
-                                    title: 'Revenue',
+                                    title: isOwner ? 'Revenue' : 'My Revenue Contrib.',
                                     value: '₹${NumberFormat('#,##,###').format(_dashboardData?['summary']['totalRevenue'] ?? 0)}',
                                     subtitle: 'Live catalog data',
                                     icon: Icons.monetization_on_outlined,
                                     color: const Color(0xFF006A61),
                                   ),
                                   _buildMetricsCard(
-                                    title: 'Bills',
+                                    title: isOwner ? 'Bills' : 'My Invoices Compiled',
                                     value: '${_dashboardData?['summary']['totalBills'] ?? 0}',
                                     subtitle: 'Invoices created',
                                     icon: Icons.receipt_long_outlined,
                                     color: const Color(0xFF86F2E4),
                                   ),
                                   _buildMetricsCard(
-                                    title: 'Customers',
+                                    title: isOwner ? 'Customers' : 'Customers I Served',
                                     value: '${_dashboardData?['summary']['totalCustomers'] ?? 0}',
                                     subtitle: 'Active CRM accounts',
                                     icon: Icons.people_outline,
                                     color: const Color(0xFF45464D),
                                   ),
                                   _buildMetricsCard(
-                                    title: 'Low Stock',
-                                    value: '${_dashboardData?['summary']['lowStockCount'] ?? 0}',
-                                    subtitle: 'SKUs below safety',
-                                    icon: Icons.warning_amber_outlined,
-                                    color: const Color(0xFFBA1A1A),
-                                    backgroundColor: const Color(0xFFFFDAD6).withValues(alpha: 0.2),
-                                    textColor: const Color(0xFFBA1A1A),
+                                    title: isOwner ? 'Low Stock' : 'Shift Status',
+                                    value: isOwner ? '${_dashboardData?['summary']['lowStockCount'] ?? 0}' : 'Active',
+                                    subtitle: isOwner ? 'SKUs below safety' : 'Shift running',
+                                    icon: isOwner ? Icons.warning_amber_outlined : Icons.check_circle_outline,
+                                    color: isOwner ? const Color(0xFFBA1A1A) : const Color(0xFF006A61),
+                                    backgroundColor: isOwner ? const Color(0xFFFFDAD6).withValues(alpha: 0.2) : const Color(0xFFE8F5F3),
+                                    textColor: isOwner ? const Color(0xFFBA1A1A) : const Color(0xFF006A61),
                                   ),
                                 ],
                               );
                             },
                           ),
-                          const SizedBox(height: 12), // Shrank from 20),
+                          const SizedBox(height: 12),
 
                           LayoutBuilder(
                             builder: (context, constraints) {
                               final width = constraints.maxWidth;
-                              if (width > 900) {
-                                return Column(
-                                  children: [
-                                    Row(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Expanded(
-                                          flex: 2,
-                                          child: _buildRevenueTrendCard(),
-                                        ),
-                                        const SizedBox(width: 12), // Shrank from 20
-                                        Expanded(
-                                          flex: 1,
-                                          child: _buildTopServicesCard(),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 12), // Shrank from 20
-                                    Row(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Expanded(
-                                          flex: 2,
-                                          child: _buildRecentInvoicesCard(),
-                                        ),
-                                        const SizedBox(width: 12), // Shrank from 20
-                                        Expanded(
-                                          flex: 1,
-                                          child: _buildLowStockCard(),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                );
+                              if (isOwner) {
+                                if (width > 900) {
+                                  return Column(
+                                    children: [
+                                      Row(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Expanded(
+                                            flex: 2,
+                                            child: _buildRevenueTrendCard(),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            flex: 1,
+                                            child: _buildTopServicesCard(),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 12),
+                                      Row(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Expanded(
+                                            flex: 2,
+                                            child: _buildRecentInvoicesCard(isOwner: true),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            flex: 1,
+                                            child: _buildLowStockCard(),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  );
+                                } else {
+                                  return Column(
+                                    children: [
+                                      _buildRevenueTrendCard(),
+                                      const SizedBox(height: 12),
+                                      _buildTopServicesCard(),
+                                      const SizedBox(height: 12),
+                                      _buildRecentInvoicesCard(isOwner: true),
+                                      const SizedBox(height: 12),
+                                      _buildLowStockCard(),
+                                    ],
+                                  );
+                                }
                               } else {
-                                return Column(
-                                  children: [
-                                    _buildRevenueTrendCard(),
-                                    const SizedBox(height: 12), // Shrank from 20
-                                    _buildTopServicesCard(),
-                                    const SizedBox(height: 12),
-                                    _buildRecentInvoicesCard(),
-                                    const SizedBox(height: 12),
-                                    _buildLowStockCard(),
-                                  ],
-                                );
+                                if (width > 900) {
+                                  return Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Expanded(
+                                        flex: 2,
+                                        child: _buildRecentInvoicesCard(isOwner: false),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        flex: 1,
+                                        child: _buildTopServicesCard(),
+                                      ),
+                                    ],
+                                  );
+                                } else {
+                                  return Column(
+                                    children: [
+                                      _buildRecentInvoicesCard(isOwner: false),
+                                      const SizedBox(height: 12),
+                                      _buildTopServicesCard(),
+                                    ],
+                                  );
+                                }
                               }
                             },
                           ),
@@ -563,7 +578,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildRecentInvoicesCard() {
+  Widget _buildRecentInvoicesCard({bool isOwner = true}) {
     final list = _dashboardData?['recentBills'] as List? ?? [];
 
     return Container(
@@ -584,19 +599,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Recent Activity Logs',
+                    isOwner ? 'Recent Activity Logs' : 'My Recent Invoices',
                     style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold, color: const Color(0xFF0B1C30)),
                   ),
                   Text(
-                    'Real-time point-of-sale audits',
+                    isOwner ? 'Real-time point-of-sale audits' : 'List of invoices processed in this shift',
                     style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF7C839B)),
                   ),
                 ],
               ),
               TextButton(
-                onPressed: () {
-                  Navigator.of(context).pushReplacementNamed('/billing');
-                },
+                 onPressed: () {
+                   final mainShell = context.findAncestorStateOfType<MainShellState>();
+                   if (mainShell != null) {
+                     mainShell.switchTab(2);
+                   } else {
+                     Navigator.of(context).pushReplacementNamed('/billing');
+                   }
+                 },
                 child: Text(
                   'POS Terminal →',
                   style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF006A61)),
@@ -638,7 +658,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              '${item['customerName'] ?? 'Walk-In Customer'} • ${DateFormat.jm().format(time)}',
+                              '${item['customerName'] ?? 'Walk-In Customer'} • ${DateFormat.jm().format(time)}' +
+                              (isOwner ? ' • Billed by: ${item['staffName'] ?? 'Owner'}' : ''),
                               style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF45464D), fontWeight: FontWeight.w500),
                             ),
                           ],

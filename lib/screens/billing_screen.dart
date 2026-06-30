@@ -6,14 +6,18 @@ import '../providers/auth_provider.dart';
 import '../providers/billing_provider.dart';
 import '../providers/bluetooth_printer_provider.dart';
 import '../models/service.dart';
-import '../models/customer.dart';
 import '../models/bill.dart';
+import '../models/customer.dart';
+import '../models/business.dart';
+import '../models/category.dart';
 import '../services/service_catalog_service.dart';
 import '../services/customer_service.dart';
 import '../services/branch_service.dart';
+import '../services/business_service.dart';
+import '../services/category_service.dart';
 import '../services/bluetooth_printer_service.dart';
-import '../widgets/sidebar_drawer.dart';
 import '../widgets/custom_text_field.dart';
+import '../services/api_client.dart';
 
 class BillingScreen extends StatefulWidget {
   const BillingScreen({Key? key}) : super(key: key);
@@ -27,15 +31,43 @@ class _BillingScreenState extends State<BillingScreen> {
   final ServiceCatalogService _serviceService = ServiceCatalogService();
   final CustomerService _customerService = CustomerService();
   final BranchService _branchService = BranchService();
+  final BusinessService _businessService = BusinessService();
+  final CategoryService _categoryService = CategoryService();
 
   List<Service> _services = [];
   List<Customer> _customers = [];
   List<Map<String, dynamic>> _branches = [];
+  List<Category> _dbCategories = [];
+  Business? _businessProfile;
   bool _isLoading = true;
 
-  String _selectedCategory = 'All';
+  final Set<int> _selectedCategoryIds = {};
+  final Set<int> _collapsedCategoryIds = {};
+  bool _hasInitializedCollapsedCategories = false;
   String _serviceQuery = '';
   String _customerQuery = '';
+
+  List<Service> _filteredServices = [];
+  List<Customer> _filteredCustomers = [];
+  Set<String> _selectedCategoryNames = {};
+
+  void _updateFilteredData() {
+    _selectedCategoryNames = _getSelectedCategoryNamesAndDescendants();
+
+    _filteredServices = _services.where((s) {
+      if (s.status != 'Active') return false;
+      final matchesCategory = _selectedCategoryIds.isEmpty ||
+          _selectedCategoryNames.contains(s.category.toLowerCase());
+      final matchesQuery = s.name.toLowerCase().contains(_serviceQuery.toLowerCase()) ||
+          s.sku.toLowerCase().contains(_serviceQuery.toLowerCase());
+      return matchesCategory && matchesQuery;
+    }).toList();
+
+    _filteredCustomers = _customers.where((c) {
+      return c.name.toLowerCase().contains(_customerQuery.toLowerCase()) ||
+          c.phone.contains(_customerQuery);
+    }).toList();
+  }
 
   // Form state to add customer
   bool _isAddingCustomer = false;
@@ -44,13 +76,24 @@ class _BillingScreenState extends State<BillingScreen> {
 
   final _promoController = TextEditingController();
 
-  bool _sendWhatsApp = true;
+  bool _sendWhatsApp = false;
   bool _printReceipt = false;
+
+  int? _lastRefreshTrigger;
 
   @override
   void initState() {
     super.initState();
-    _fetchInitialData();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final billingProvider = Provider.of<BillingProvider>(context);
+    if (_lastRefreshTrigger != billingProvider.refreshTrigger) {
+      _lastRefreshTrigger = billingProvider.refreshTrigger;
+      _fetchInitialData();
+    }
   }
 
   Future<void> _fetchInitialData() async {
@@ -66,6 +109,8 @@ class _BillingScreenState extends State<BillingScreen> {
         _serviceService.getAll(),
         _customerService.getAll(),
         _branchService.getAll(),
+        _businessService.getProfile(),
+        _categoryService.getAll(),
       ]);
 
       if (!mounted) return;
@@ -73,6 +118,9 @@ class _BillingScreenState extends State<BillingScreen> {
         _services = results[0] as List<Service>;
         _customers = results[1] as List<Customer>;
         _branches = results[2] as List<Map<String, dynamic>>;
+        _businessProfile = results[3] as Business;
+        _dbCategories = (results[4] as List<Category>).where((c) => c.type == 'Service').toList();
+        _updateFilteredData();
       });
 
       // Find default customer (Walk-In)
@@ -138,6 +186,7 @@ class _BillingScreenState extends State<BillingScreen> {
         _isAddingCustomer = false;
         _newCustNameController.clear();
         _newCustPhoneController.clear();
+        _updateFilteredData();
       });
 
       if (mounted) {
@@ -148,36 +197,17 @@ class _BillingScreenState extends State<BillingScreen> {
       }
     } catch (e) {
       if (mounted) {
-        showDialog(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Text('Error'),
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
             content: Text('Could not create customer: $e'),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK')),
-            ],
+            backgroundColor: const Color(0xFFBA1A1A),
           ),
         );
       }
     }
   }
 
-  Widget _buildCategoryIcon(String iconName) {
-    switch (iconName) {
-      case 'content_cut':
-        return const Text('✂️', style: TextStyle(fontSize: 20));
-      case 'face':
-        return const Text('👤', style: TextStyle(fontSize: 20));
-      case 'spa':
-        return const Text('🌸', style: TextStyle(fontSize: 20));
-      case 'brush':
-        return const Text('🎨', style: TextStyle(fontSize: 20));
-      case 'water_drop':
-        return const Text('💧', style: TextStyle(fontSize: 20));
-      default:
-        return const Text('📦', style: TextStyle(fontSize: 20));
-    }
-  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -186,7 +216,6 @@ class _BillingScreenState extends State<BillingScreen> {
     if (_isLoading) {
       return Scaffold(
         appBar: AppBar(title: const Text('Billing POS')),
-        drawer: const SidebarDrawer(activeRoute: '/billing'),
         body: const Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -207,21 +236,8 @@ class _BillingScreenState extends State<BillingScreen> {
         ),
       );
     }
-
-    final categories = ['All', ..._services.where((s) => s.status == 'Active').map((s) => s.category).toSet().toList()];
-
-    final filteredServices = _services.where((s) {
-      if (s.status != 'Active') return false;
-      final matchesCategory = _selectedCategory == 'All' || s.category == _selectedCategory;
-      final matchesQuery = s.name.toLowerCase().contains(_serviceQuery.toLowerCase()) ||
-          s.sku.toLowerCase().contains(_serviceQuery.toLowerCase());
-      return matchesCategory && matchesQuery;
-    }).toList();
-
-    final filteredCustomers = _customers.where((c) {
-      return c.name.toLowerCase().contains(_customerQuery.toLowerCase()) ||
-          c.phone.contains(_customerQuery);
-    }).toList();
+    final filteredServices = _filteredServices;
+    final filteredCustomers = _filteredCustomers;
 
     Customer currentSelectedCustomer;
     try {
@@ -246,10 +262,13 @@ class _BillingScreenState extends State<BillingScreen> {
           style: GoogleFonts.outfit(fontWeight: FontWeight.w900),
         ),
       ),
-      drawer: const SidebarDrawer(activeRoute: '/billing'),
       body: LayoutBuilder(
         builder: (context, constraints) {
           final width = constraints.maxWidth;
+          final gridWidth = (width > 900) ? (width * 8 / 12) : width;
+          int columns = (gridWidth / 150).floor();
+          if (columns < 2) columns = 2;
+
           if (width > 900) {
             // Desktop side-by-side split layout
             return Row(
@@ -270,6 +289,7 @@ class _BillingScreenState extends State<BillingScreen> {
                           onChanged: (val) {
                             setState(() {
                               _serviceQuery = val;
+                              _updateFilteredData();
                             });
                           },
                           textInputAction: TextInputAction.search,
@@ -295,40 +315,7 @@ class _BillingScreenState extends State<BillingScreen> {
                       ),
 
                       // Category chips list
-                      Container(
-                        height: 40, // Shrank from 48
-                        padding: const EdgeInsets.symmetric(vertical: 4.0), // Shrank from 6.0
-                        child: ListView.builder(
-                          scrollDirection: Axis.horizontal,
-                          padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                          itemCount: categories.length,
-                          itemBuilder: (context, index) {
-                            final cat = categories[index];
-                            final isSelected = _selectedCategory == cat;
-                            return Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                              child: ChoiceChip(
-                                label: Text(
-                                  cat,
-                                  style: GoogleFonts.inter(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                    color: isSelected ? Colors.white : const Color(0xFF45464D),
-                                  ),
-                                ),
-                                selected: isSelected,
-                                selectedColor: const Color(0xFF006A61),
-                                backgroundColor: const Color(0xFFEFF4FF),
-                                onSelected: (selected) {
-                                  setState(() {
-                                    _selectedCategory = cat;
-                                  });
-                                },
-                              ),
-                            );
-                          },
-                        ),
-                      ),
+                      _buildFilterChipsRow(),
                       const Divider(height: 1),
 
                       // Services Grid View
@@ -342,72 +329,16 @@ class _BillingScreenState extends State<BillingScreen> {
                               )
                             : GridView.builder(
                                 padding: const EdgeInsets.all(12),
-                                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: 4,
+                                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: columns,
                                   crossAxisSpacing: 10,
                                   mainAxisSpacing: 10,
-                                  childAspectRatio: 1.25,
+                                  childAspectRatio: 0.85,
                                 ),
                                 itemCount: filteredServices.length,
                                 itemBuilder: (context, index) {
                                   final service = filteredServices[index];
-                                  return Card(
-                                    color: Colors.white,
-                                    elevation: 1,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                      side: const BorderSide(color: Color(0xFFE2E8F0)),
-                                    ),
-                                    child: InkWell(
-                                      borderRadius: BorderRadius.circular(12),
-                                      onTap: () {
-                                        billingProvider.addService(service);
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(
-                                            content: Text('${service.name} added to cart.'),
-                                            duration: const Duration(seconds: 1),
-                                          ),
-                                        );
-                                      },
-                                      child: Padding(
-                                        padding: const EdgeInsets.all(12.0),
-                                        child: Column(
-                                          mainAxisAlignment: MainAxisAlignment.center,
-                                          children: [
-                                            Container(
-                                              padding: const EdgeInsets.all(8),
-                                              decoration: const BoxDecoration(
-                                                color: Color(0xFFEFF4FF),
-                                                shape: BoxShape.circle,
-                                              ),
-                                              child: _buildCategoryIcon(service.iconName),
-                                            ),
-                                            const SizedBox(height: 6),
-                                            Text(
-                                              service.name,
-                                              maxLines: 2,
-                                              textAlign: TextAlign.center,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: GoogleFonts.outfit(
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.bold,
-                                                color: const Color(0xFF0B1C30),
-                                              ),
-                                            ),
-                                            const SizedBox(height: 4),
-                                            Text(
-                                              '₹${NumberFormat('#,##,###').format(service.basePrice)}',
-                                              style: GoogleFonts.inter(
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.w900,
-                                                color: const Color(0xFF006A61),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  );
+                                  return _buildModernServiceCard(context, service, billingProvider);
                                 },
                               ),
                       ),
@@ -445,6 +376,7 @@ class _BillingScreenState extends State<BillingScreen> {
                     onChanged: (val) {
                       setState(() {
                         _serviceQuery = val;
+                        _updateFilteredData();
                       });
                     },
                     textInputAction: TextInputAction.search,
@@ -470,40 +402,7 @@ class _BillingScreenState extends State<BillingScreen> {
                 ),
 
                 // Category chips list
-                Container(
-                  height: 48,
-                  padding: const EdgeInsets.symmetric(vertical: 6.0),
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                    itemCount: categories.length,
-                    itemBuilder: (context, index) {
-                      final cat = categories[index];
-                      final isSelected = _selectedCategory == cat;
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                        child: ChoiceChip(
-                          label: Text(
-                            cat,
-                            style: GoogleFonts.inter(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: isSelected ? Colors.white : const Color(0xFF45464D),
-                            ),
-                          ),
-                          selected: isSelected,
-                          selectedColor: const Color(0xFF006A61),
-                          backgroundColor: const Color(0xFFEFF4FF),
-                          onSelected: (selected) {
-                            setState(() {
-                              _selectedCategory = cat;
-                            });
-                          },
-                        ),
-                      );
-                    },
-                  ),
-                ),
+                _buildFilterChipsRow(),
                 const Divider(height: 1),
 
                 // Services Grid View
@@ -517,72 +416,16 @@ class _BillingScreenState extends State<BillingScreen> {
                         )
                       : GridView.builder(
                           padding: const EdgeInsets.all(12),
-                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
+                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: columns,
                             crossAxisSpacing: 10,
                             mainAxisSpacing: 10,
-                            childAspectRatio: 1.25,
+                            childAspectRatio: 0.85,
                           ),
                           itemCount: filteredServices.length,
                           itemBuilder: (context, index) {
                             final service = filteredServices[index];
-                            return Card(
-                              color: Colors.white,
-                              elevation: 1,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                side: const BorderSide(color: Color(0xFFE2E8F0)),
-                              ),
-                              child: InkWell(
-                                borderRadius: BorderRadius.circular(12),
-                                onTap: () {
-                                  billingProvider.addService(service);
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text('${service.name} added to cart.'),
-                                      duration: const Duration(seconds: 1),
-                                    ),
-                                  );
-                                },
-                                child: Padding(
-                                  padding: const EdgeInsets.all(12.0),
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.all(8),
-                                        decoration: const BoxDecoration(
-                                          color: Color(0xFFEFF4FF),
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: _buildCategoryIcon(service.iconName),
-                                      ),
-                                      const SizedBox(height: 6),
-                                      Text(
-                                        service.name,
-                                        maxLines: 2,
-                                        textAlign: TextAlign.center,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: GoogleFonts.outfit(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.bold,
-                                          color: const Color(0xFF0B1C30),
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        '₹${NumberFormat('#,##,###').format(service.basePrice)}',
-                                        style: GoogleFonts.inter(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w900,
-                                          color: const Color(0xFF006A61),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            );
+                            return _buildModernServiceCard(context, service, billingProvider);
                           },
                         ),
                 ),
@@ -680,76 +523,80 @@ class _BillingScreenState extends State<BillingScreen> {
         ),
       ),
       builder: (context) {
-        return Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom,
-          ),
-          child: Consumer<BillingProvider>(
-            builder: (context, bp, child) {
-              Customer activeCust;
-              try {
-                activeCust = _customers.firstWhere((c) => c.id == bp.selectedCustomerId);
-              } catch (_) {
-                activeCust = currentSelectedCustomer;
-              }
+        return StatefulBuilder(
+          builder: (context, setBottomSheetState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+              ),
+              child: Consumer<BillingProvider>(
+                builder: (context, bp, child) {
+                  Customer activeCust;
+                  try {
+                    activeCust = _customers.firstWhere((c) => c.id == bp.selectedCustomerId);
+                  } catch (_) {
+                    activeCust = currentSelectedCustomer;
+                  }
 
-              return DraggableScrollableSheet(
-                initialChildSize: 0.85,
-                minChildSize: 0.5,
-                maxChildSize: 0.95,
-                expand: false,
-                builder: (context, scrollController) {
-                  return Column(
-                    children: [
-                      // Grab handle decoration
-                      Container(
-                        margin: const EdgeInsets.symmetric(vertical: 8),
-                        width: 40,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFC6C6CD),
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                      // Header with close button
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'Checkout Review',
-                              style: GoogleFonts.outfit(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: const Color(0xFF0B1C30),
+                  return DraggableScrollableSheet(
+                    initialChildSize: 0.85,
+                    minChildSize: 0.5,
+                    maxChildSize: 0.95,
+                    expand: false,
+                    builder: (context, scrollController) {
+                      return Column(
+                        children: [
+                          // Grab handle decoration
+                          Container(
+                            margin: const EdgeInsets.symmetric(vertical: 8),
+                            width: 40,
+                            height: 4,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFC6C6CD),
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                          // Header with close button
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Checkout Review',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: const Color(0xFF0B1C30),
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.close),
+                                  onPressed: () => Navigator.pop(context),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Divider(height: 1),
+                          // Scrollable content containing all checkout details
+                          Expanded(
+                            child: SingleChildScrollView(
+                              controller: scrollController,
+                              padding: const EdgeInsets.all(16.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: _buildCheckoutPanelItems(bp, activeCust, setModalState: setBottomSheetState),
                               ),
                             ),
-                            IconButton(
-                              icon: const Icon(Icons.close),
-                              onPressed: () => Navigator.pop(context),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Divider(height: 1),
-                      // Scrollable content containing all checkout details
-                      Expanded(
-                        child: SingleChildScrollView(
-                          controller: scrollController,
-                          padding: const EdgeInsets.all(16.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: _buildCheckoutPanelItems(bp, activeCust),
                           ),
-                        ),
-                      ),
-                    ],
+                        ],
+                      );
+                    },
                   );
                 },
-              );
-            },
-          ),
+              ),
+            );
+          },
         );
       },
     );
@@ -757,8 +604,9 @@ class _BillingScreenState extends State<BillingScreen> {
 
   List<Widget> _buildCheckoutPanelItems(
     BillingProvider billingProvider,
-    Customer currentSelectedCustomer,
-  ) {
+    Customer currentSelectedCustomer, {
+    void Function(void Function())? setModalState,
+  }) {
     return [
         Row(
         children: [
@@ -898,12 +746,25 @@ class _BillingScreenState extends State<BillingScreen> {
                           overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 2),
-                        Text(
-                          '₹${NumberFormat('#,##,###').format(item.unitPrice)} each',
-                          style: GoogleFonts.inter(
-                            fontSize: 11,
-                            color: const Color(0xFF7C839B),
-                          ),
+                        Row(
+                          children: [
+                            Text(
+                              '₹${NumberFormat('#,##,###').format(item.unitPrice)} each',
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                color: const Color(0xFF7C839B),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            InkWell(
+                              onTap: () => _showEditPriceDialog(context, item, billingProvider),
+                              child: const Icon(
+                                Icons.edit_outlined,
+                                size: 12,
+                                color: Color(0xFF006A61),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -943,28 +804,65 @@ class _BillingScreenState extends State<BillingScreen> {
         child: Column(
           children: [
             // Promo entry
+            // Modern Discount Type Selector
+            Row(
+              children: [
+                Text(
+                  'DISCOUNT TYPE',
+                  style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFF7C839B), letterSpacing: 0.5),
+                ),
+                const Spacer(),
+                ChoiceChip(
+                  label: const Text('% Percent'),
+                  selected: billingProvider.discountType == 'percentage',
+                  onSelected: (val) {
+                    if (val) {
+                      billingProvider.setDiscount('percentage', 0);
+                    }
+                  },
+                  selectedColor: const Color(0xFF006A61),
+                  labelStyle: GoogleFonts.inter(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: billingProvider.discountType == 'percentage' ? Colors.white : const Color(0xFF7C839B),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                ChoiceChip(
+                  label: const Text('₹ Flat'),
+                  selected: billingProvider.discountType == 'flat',
+                  onSelected: (val) {
+                    if (val) {
+                      billingProvider.setDiscount('flat', 0);
+                    }
+                  },
+                  selectedColor: const Color(0xFF006A61),
+                  labelStyle: GoogleFonts.inter(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: billingProvider.discountType == 'flat' ? Colors.white : const Color(0xFF7C839B),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            // Custom discount value input
             Row(
               children: [
                 Expanded(
                   child: TextField(
-                    controller: _promoController,
-                    style: GoogleFonts.inter(fontSize: 13),
-                    textInputAction: TextInputAction.done,
-                    autocorrect: false,
-                    textCapitalization: TextCapitalization.characters,
-                    onSubmitted: (val) {
-                      final msg = billingProvider.applyPromo(val);
-                      _promoController.clear();
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
-                    },
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold),
                     decoration: InputDecoration(
-                      hintText: 'Enter Promo Code (e.g. VIP10)',
-                      hintStyle: GoogleFonts.inter(color: const Color(0x997C839B), fontSize: 13),
+                      hintText: billingProvider.discountType == 'percentage' ? 'Enter discount percent...' : 'Enter discount amount...',
+                      hintStyle: GoogleFonts.inter(color: const Color(0x997C839B), fontSize: 12),
+                      prefixText: billingProvider.discountType == 'percentage' ? null : '₹ ',
+                      suffixText: billingProvider.discountType == 'percentage' ? ' %' : null,
                       filled: true,
-                      fillColor: Colors.white,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      fillColor: const Color(0xFFF9FAFB),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                       enabledBorder: OutlineInputBorder(
-                        borderSide: const BorderSide(color: Color(0xFFC6C6CD), width: 1.0),
+                        borderSide: const BorderSide(color: Color(0xFFE2E8F0), width: 1.0),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       focusedBorder: OutlineInputBorder(
@@ -972,26 +870,59 @@ class _BillingScreenState extends State<BillingScreen> {
                         borderRadius: BorderRadius.circular(8),
                       ),
                     ),
+                    onChanged: (val) {
+                      final parsed = double.tryParse(val) ?? 0.0;
+                      billingProvider.setDiscount(billingProvider.discountType, parsed);
+                    },
                   ),
-                ),
-                const SizedBox(width: 8),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFEFF4FF),
-                    foregroundColor: const Color(0xFF006A61),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  ),
-                  onPressed: () {
-                    final msg = billingProvider.applyPromo(_promoController.text);
-                    _promoController.clear();
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
-                  },
-                  child: Text('Apply', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
                 ),
               ],
+            ),
+            const SizedBox(height: 6),
+            // Quick Action Chips
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: billingProvider.discountType == 'percentage'
+                    ? [5, 10, 15, 20, 30, 50].map((pct) {
+                        final isSelected = billingProvider.discountValue == pct;
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 6.0),
+                          child: ActionChip(
+                            padding: EdgeInsets.zero,
+                            visualDensity: const VisualDensity(horizontal: -4, vertical: -4),
+                            label: Text('$pct%'),
+                            onPressed: () => billingProvider.setDiscount('percentage', pct.toDouble()),
+                            backgroundColor: isSelected ? const Color(0xFFE8F5F3) : Colors.white,
+                            side: BorderSide(color: isSelected ? const Color(0xFF006A61) : const Color(0xFFE2E8F0)),
+                            labelStyle: GoogleFonts.inter(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: isSelected ? const Color(0xFF006A61) : const Color(0xFF45464D),
+                            ),
+                          ),
+                        );
+                      }).toList()
+                    : [50, 100, 200, 500].map((flat) {
+                        final isSelected = billingProvider.discountValue == flat;
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 6.0),
+                          child: ActionChip(
+                            padding: EdgeInsets.zero,
+                            visualDensity: const VisualDensity(horizontal: -4, vertical: -4),
+                            label: Text('₹$flat'),
+                            onPressed: () => billingProvider.setDiscount('flat', flat.toDouble()),
+                            backgroundColor: isSelected ? const Color(0xFFE8F5F3) : Colors.white,
+                            side: BorderSide(color: isSelected ? const Color(0xFF006A61) : const Color(0xFFE2E8F0)),
+                            labelStyle: GoogleFonts.inter(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: isSelected ? const Color(0xFF006A61) : const Color(0xFF45464D),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+              ),
             ),
             const SizedBox(height: 10), // Shrank from 16
             // Math stats
@@ -1001,7 +932,8 @@ class _BillingScreenState extends State<BillingScreen> {
               '-₹${NumberFormat('#,##,###').format(billingProvider.discountAmount)}',
               textColor: const Color(0xFF006A61),
             ),
-            _buildSummaryRow('Tax (5% Flat Local)', '₹${NumberFormat('#,##,###').format(billingProvider.taxAmount)}'),
+            if (billingProvider.taxAmount > 0)
+              _buildSummaryRow('Tax', '₹${NumberFormat('#,##,###').format(billingProvider.taxAmount)}'),
             const Divider(height: 12),
             // Grand Total
             Container(
@@ -1058,43 +990,42 @@ class _BillingScreenState extends State<BillingScreen> {
             child: InkWell(
               borderRadius: BorderRadius.circular(8),
               onTap: () {
-                setState(() {
-                  _sendWhatsApp = !_sendWhatsApp;
-                });
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('WhatsApp Integration is coming soon!'),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
               },
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
                 decoration: BoxDecoration(
-                  color: _sendWhatsApp ? const Color(0xFFE8F5E9) : Colors.white,
+                  color: const Color(0xFFF9FAFB),
                   border: Border.all(
-                    color: _sendWhatsApp ? const Color(0xFF4CAF50) : const Color(0xFFE2E8F0),
-                    width: _sendWhatsApp ? 1.5 : 1.0,
+                    color: const Color(0xFFE5E7EB),
+                    width: 1.0,
                   ),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
                   children: [
-                    SizedBox(
+                    const SizedBox(
                       width: 24,
                       height: 24,
                       child: Checkbox(
-                        value: _sendWhatsApp,
+                        value: false,
+                        onChanged: null,
                         activeColor: const Color(0xFF4CAF50),
                         materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        onChanged: (val) {
-                          setState(() {
-                            _sendWhatsApp = val ?? false;
-                          });
-                        },
                       ),
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      'WhatsApp',
+                      'WhatsApp (Soon)',
                       style: GoogleFonts.inter(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
-                        color: _sendWhatsApp ? const Color(0xFF2E7D32) : const Color(0xFF45464D),
+                        color: const Color(0xFF9CA3AF),
                       ),
                     ),
                   ],
@@ -1107,9 +1038,15 @@ class _BillingScreenState extends State<BillingScreen> {
             child: InkWell(
               borderRadius: BorderRadius.circular(8),
               onTap: () {
-                setState(() {
-                  _printReceipt = !_printReceipt;
-                });
+                if (setModalState != null) {
+                  setModalState(() {
+                    _printReceipt = !_printReceipt;
+                  });
+                } else {
+                  setState(() {
+                    _printReceipt = !_printReceipt;
+                  });
+                }
               },
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
@@ -1131,9 +1068,15 @@ class _BillingScreenState extends State<BillingScreen> {
                         activeColor: const Color(0xFF009688),
                         materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         onChanged: (val) {
-                          setState(() {
-                            _printReceipt = val ?? false;
-                          });
+                          if (setModalState != null) {
+                            setModalState(() {
+                              _printReceipt = val ?? false;
+                            });
+                          } else {
+                            setState(() {
+                              _printReceipt = val ?? false;
+                            });
+                          }
                         },
                       ),
                     ),
@@ -1273,6 +1216,7 @@ class _BillingScreenState extends State<BillingScreen> {
             onChanged: (val) {
               setState(() {
                 _customerQuery = val;
+                _updateFilteredData();
               });
             },
             textInputAction: TextInputAction.search,
@@ -1381,11 +1325,13 @@ class _BillingScreenState extends State<BillingScreen> {
     }
 
     try {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final bill = await billingProvider.checkout(
         branchId: billingProvider.selectedBranchId!,
         customerId: currentCustomer.id,
         customerName: currentCustomer.name,
         customerPhone: currentCustomer.phone,
+        createdByStaffId: authProvider.currentUser?.staffId,
       );
 
       if (!mounted) return;
@@ -1402,13 +1348,13 @@ class _BillingScreenState extends State<BillingScreen> {
       if (_printReceipt) {
         final printerProvider = Provider.of<BluetoothPrinterProvider>(context, listen: false);
         if (printerProvider.connectionState == PrinterConnectionState.connected) {
-          printSuccess = await printerProvider.printBill(bill, businessName: bill.branchName ?? 'SmartBill Pro');
+          printSuccess = await printerProvider.printBill(bill, businessName: bill.branchName ?? 'BillCom', business: _businessProfile);
           printErrorMessage = printerProvider.errorMessage;
         } else {
           // Attempt auto connect
           final success = await printerProvider.autoDetectAndConnect();
           if (success) {
-            printSuccess = await printerProvider.printBill(bill, businessName: bill.branchName ?? 'SmartBill Pro');
+            printSuccess = await printerProvider.printBill(bill, businessName: bill.branchName ?? 'BillCom', business: _businessProfile);
             printErrorMessage = printerProvider.errorMessage;
           } else {
             printSuccess = false;
@@ -1441,168 +1387,409 @@ class _BillingScreenState extends State<BillingScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-      showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('POS Error'),
-          content: Text('$e'),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK')),
-          ],
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('POS Error: $e'),
+          backgroundColor: const Color(0xFFBA1A1A),
         ),
       );
     }
   }
 
-  Widget _buildPopupRow(String label, String value, {bool isTotal = false}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  // --- Tree Category Filtering Helpers ---
+  List<_CategoryNode> _buildCategoryTree(List<Category> flatCategories) {
+    final Map<int, _CategoryNode> map = {
+      for (var cat in flatCategories) cat.id: _CategoryNode(cat)
+    };
+    final List<_CategoryNode> roots = [];
+    for (var node in map.values) {
+      final pId = node.category.parentId;
+      if (pId == null || !map.containsKey(pId)) {
+        roots.add(node);
+      } else {
+        map[pId]!.children.add(node);
+      }
+    }
+    return roots;
+  }
+
+  void _flattenTree(List<_CategoryNode> nodes, int depth, List<_FlattenedCategoryNode> result, Set<int> collapsedNodeIds) {
+    for (var node in nodes) {
+      final isCollapsed = collapsedNodeIds.contains(node.category.id);
+      result.add(_FlattenedCategoryNode(
+        node.category,
+        depth,
+        node.children.isNotEmpty,
+      ));
+      if (!isCollapsed && node.children.isNotEmpty) {
+        _flattenTree(node.children, depth + 1, result, collapsedNodeIds);
+      }
+    }
+  }
+
+  Set<String> _getSelectedCategoryNamesAndDescendants() {
+    if (_selectedCategoryIds.isEmpty) return {};
+    final Set<String> names = {};
+    final tree = _buildCategoryTree(_dbCategories);
+    
+    void addDescendants(List<_CategoryNode> nodes, bool parentSelected) {
+      for (var node in nodes) {
+        final isSelected = parentSelected || _selectedCategoryIds.contains(node.category.id);
+        if (isSelected) {
+          names.add(node.category.name.toLowerCase());
+        }
+        if (node.children.isNotEmpty) {
+          addDescendants(node.children, isSelected);
+        }
+      }
+    }
+    
+    addDescendants(tree, false);
+    return names;
+  }
+
+  void _toggleCategoryCheck(int catId, bool checked, List<Category> allCats, Set<int> selectedIds) {
+    if (checked) {
+      selectedIds.add(catId);
+    } else {
+      selectedIds.remove(catId);
+    }
+    
+    final children = allCats.where((c) => c.parentId == catId).toList();
+    for (var child in children) {
+      _toggleCategoryCheck(child.id, checked, allCats, selectedIds);
+    }
+  }
+
+  Widget _buildFilterChipsRow() {
+    final selectedCats = _dbCategories.where((c) => _selectedCategoryIds.contains(c.id)).toList();
+    
+    return Container(
+      height: 40,
+      padding: const EdgeInsets.symmetric(vertical: 2.0),
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16.0),
         children: [
-          Text(
-            label,
-            style: GoogleFonts.inter(
-              fontSize: 11,
-              color: const Color(0xFF45464D),
-              fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
-            ),
-          ),
-          Text(
-            value,
-            style: isTotal
-                ? GoogleFonts.outfit(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w900,
-                    color: const Color(0xFF006A61),
-                  )
-                : GoogleFonts.inter(
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    color: const Color(0xFF0B1C30),
-                  ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showReceiptPreviewDialog(BuildContext context, Bill bill, String receiptText) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'Thermal Print Job',
-              style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 16, color: const Color(0xFF0B1C30)),
-            ),
-            IconButton(
-              icon: const Icon(Icons.close),
-              onPressed: () => Navigator.pop(ctx),
-            ),
-          ],
-        ),
-        content: Container(
-          width: 320,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-          decoration: BoxDecoration(
-            color: const Color(0xFFFAFAF7),
+          Material(
+            color: _selectedCategoryIds.isNotEmpty ? const Color(0xFF006A61).withOpacity(0.1) : const Color(0xFFEFF4FF),
             borderRadius: BorderRadius.circular(8),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
-                blurRadius: 8,
-                offset: const Offset(0, 4),
-              ),
-            ],
-            border: Border.all(color: const Color(0xFFE2E8F0)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Receipt feed output
-              Container(
-                constraints: const BoxConstraints(maxHeight: 400),
-                child: SingleChildScrollView(
-                  child: Text(
-                    receiptText,
-                    style: GoogleFonts.shareTechMono(
-                      fontSize: 13,
-                      height: 1.3,
-                      color: const Color(0xFF1E293B),
-                      fontWeight: FontWeight.w600,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: _showCategoryFilterBottomSheet,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.filter_alt_outlined,
+                      size: 16,
+                      color: _selectedCategoryIds.isNotEmpty ? const Color(0xFF006A61) : const Color(0xFF45464D),
                     ),
-                  ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Categories',
+                      style: GoogleFonts.inter(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: _selectedCategoryIds.isNotEmpty ? const Color(0xFF006A61) : const Color(0xFF45464D),
+                      ),
+                    ),
+                    if (_selectedCategoryIds.isNotEmpty) ...[
+                      const SizedBox(width: 4),
+                      Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF006A61),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Text(
+                          '${_selectedCategoryIds.length}',
+                          style: const TextStyle(fontSize: 8, color: Colors.white, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
-              const SizedBox(height: 16),
-              // Jagged paper tear representation at bottom
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(
-                  15,
-                  (index) => const Text(
-                    '/\\',
-                    style: TextStyle(
-                      color: Color(0xFFCBD5E1),
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF006A61),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
-            onPressed: () async {
-              final messenger = ScaffoldMessenger.of(context);
-              Navigator.pop(ctx);
-              final printerProvider = Provider.of<BluetoothPrinterProvider>(context, listen: false);
-              final success = await printerProvider.printBill(bill, businessName: bill.branchName ?? 'SmartBill Pro');
-              if (success) {
-                messenger.showSnackBar(
-                  const SnackBar(content: Text('Receipt printed successfully!')),
-                );
-              } else {
-                messenger.showSnackBar(
-                  SnackBar(content: Text('Failed to print: ${printerProvider.errorMessage ?? "Unknown error"}')),
-                );
-              }
-            },
-            child: Text('Confirm Print', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
           ),
+          const SizedBox(width: 8),
+          
+          if (_selectedCategoryIds.isEmpty)
+            ChoiceChip(
+              label: Text(
+                'All Categories',
+                style: GoogleFonts.inter(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              selected: true,
+              selectedColor: const Color(0xFF006A61),
+              onSelected: (_) {
+                _showCategoryFilterBottomSheet();
+              },
+            )
+          else
+            ...selectedCats.map((cat) {
+              return Padding(
+                padding: const EdgeInsets.only(right: 6.0),
+                child: InputChip(
+                  label: Text(
+                    cat.name,
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFF006A61),
+                    ),
+                  ),
+                  backgroundColor: const Color(0xFF006A61).withOpacity(0.08),
+                  selected: false,
+                  onDeleted: () {
+                    setState(() {
+                      _toggleCategoryCheck(cat.id, false, _dbCategories, _selectedCategoryIds);
+                      _updateFilteredData();
+                    });
+                  },
+                  deleteIconColor: const Color(0xFF006A61),
+                  deleteIcon: const Icon(Icons.close, size: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    side: const BorderSide(color: Color(0xFF006A61), width: 0.5),
+                  ),
+                ),
+              );
+            }),
         ],
       ),
     );
   }
 
-  void _showNoPrinterDialog(BuildContext context, Bill bill) {
+  void _showCategoryFilterBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(20),
+          topRight: Radius.circular(20),
+        ),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setBottomSheetState) {
+          if (!_hasInitializedCollapsedCategories && _dbCategories.isNotEmpty) {
+            _collapsedCategoryIds.addAll(_dbCategories.map((c) => c.id));
+            _hasInitializedCollapsedCategories = true;
+          }
+          final tree = _buildCategoryTree(_dbCategories);
+          final List<_FlattenedCategoryNode> tempFlat = [];
+          _flattenTree(tree, 0, tempFlat, _collapsedCategoryIds);
+
+          return Container(
+            height: 480,
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Column(
+              children: [
+                Container(
+                  margin: const EdgeInsets.symmetric(vertical: 8),
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFC6C6CD),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Filter by Service Categories',
+                        style: GoogleFonts.outfit(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 16,
+                          color: const Color(0xFF0B1C30),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          setBottomSheetState(() {
+                            _selectedCategoryIds.clear();
+                          });
+                          setState(() {
+                            _updateFilteredData();
+                          });
+                        },
+                        child: Text(
+                          'Clear All',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFFBA1A1A),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+                Expanded(
+                  child: tempFlat.isEmpty
+                      ? Center(
+                          child: Text(
+                            'No service categories created yet.',
+                            style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF7C839B), fontWeight: FontWeight.bold),
+                          ),
+                        )
+                      : ListView.separated(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          itemCount: tempFlat.length,
+                          separatorBuilder: (c, i) => const Divider(height: 1),
+                          itemBuilder: (ctx, idx) {
+                            final node = tempFlat[idx];
+                            final cat = node.category;
+                            final isChecked = _selectedCategoryIds.contains(cat.id);
+                            return Padding(
+                              padding: EdgeInsets.only(left: node.depth * 20.0),
+                              child: ListTile(
+                                contentPadding: EdgeInsets.zero,
+                                visualDensity: const VisualDensity(horizontal: 0, vertical: -4),
+                                onTap: () {
+                                  if (node.hasChildren) {
+                                    setBottomSheetState(() {
+                                      if (_collapsedCategoryIds.contains(cat.id)) {
+                                        _collapsedCategoryIds.remove(cat.id);
+                                      } else {
+                                        _collapsedCategoryIds.add(cat.id);
+                                      }
+                                    });
+                                  } else {
+                                    final newVal = !isChecked;
+                                    setBottomSheetState(() {
+                                      _toggleCategoryCheck(cat.id, newVal, _dbCategories, _selectedCategoryIds);
+                                    });
+                                    setState(() {
+                                      _updateFilteredData();
+                                    });
+                                  }
+                                },
+                                leading: node.hasChildren
+                                    ? Icon(
+                                        _collapsedCategoryIds.contains(cat.id)
+                                            ? Icons.keyboard_arrow_right_rounded
+                                            : Icons.keyboard_arrow_down_rounded,
+                                        size: 20,
+                                        color: const Color(0xFF006A61),
+                                      )
+                                    : Container(
+                                        width: 20,
+                                        alignment: Alignment.center,
+                                        child: const Icon(Icons.subdirectory_arrow_right_rounded, size: 14, color: Color(0xFF7C839B)),
+                                      ),
+                                title: Row(
+                                  children: [
+                                    Checkbox(
+                                      value: isChecked,
+                                      activeColor: const Color(0xFF006A61),
+                                      onChanged: (val) {
+                                        if (val != null) {
+                                          setBottomSheetState(() {
+                                            _toggleCategoryCheck(cat.id, val, _dbCategories, _selectedCategoryIds);
+                                          });
+                                          setState(() {
+                                            _updateFilteredData();
+                                          });
+                                        }
+                                      },
+                                    ),
+                                    Expanded(
+                                      child: Text(
+                                        cat.name,
+                                        style: GoogleFonts.inter(
+                                          fontSize: 13,
+                                          fontWeight: node.depth == 0 ? FontWeight.bold : FontWeight.w500,
+                                          color: const Color(0xFF0B1C30),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF006A61),
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size(double.infinity, 44),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                    },
+                    child: Text('Apply Filter', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  void _showEditPriceDialog(BuildContext context, BillItem item, BillingProvider bp) {
+    final controller = TextEditingController(text: item.unitPrice.toStringAsFixed(0));
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(
-          'No Printer Paired',
-          style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 16, color: const Color(0xFF0B1C30)),
+          'Edit Unit Price',
+          style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 16),
         ),
-        content: Text(
-          'Could not find a paired Bluetooth billing printer on your device.\n\nPlease open your Mobile Settings -> Bluetooth, pair/connect your printing machine there, and then try again.',
-          style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF7C839B), height: 1.4),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Change price for "${item.serviceName}":',
+              style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF7C839B)),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              autofocus: true,
+              style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold),
+              decoration: InputDecoration(
+                prefixText: '₹ ',
+                prefixStyle: GoogleFonts.inter(fontWeight: FontWeight.bold, color: const Color(0xFF0B1C30)),
+                enabledBorder: OutlineInputBorder(
+                  borderSide: const BorderSide(color: Color(0xFFC6C6CD)),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderSide: const BorderSide(color: Color(0xFF006A61), width: 1.5),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+          ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text('Cancel', style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: const Color(0xFF7C839B))),
+            child: Text('Cancel', style: GoogleFonts.inter(color: const Color(0xFF7C839B))),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -1611,15 +1798,166 @@ class _BillingScreenState extends State<BillingScreen> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
             onPressed: () {
-              Navigator.pop(ctx);
-              Navigator.pushNamed(context, '/settings');
+              final newPrice = double.tryParse(controller.text);
+              if (newPrice != null && newPrice >= 0) {
+                bp.updateUnitPrice(item.serviceId, newPrice);
+                Navigator.pop(ctx);
+              }
             },
-            child: Text('Check Settings', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
+            child: Text('Save', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
           ),
         ],
       ),
     );
   }
+
+  Widget _buildModernServiceCard(BuildContext context, Service service, BillingProvider billingProvider) {
+    return Card(
+      elevation: 0.5,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: Color(0xFFF1F3F5), width: 1),
+      ),
+      child: InkWell(
+        onTap: () {
+          billingProvider.addService(service);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${service.name} added to cart.'),
+              duration: const Duration(seconds: 1),
+            ),
+          );
+        },
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Image / Placeholder Section
+            Expanded(
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: ApiClient.resolveUrl(service.imageUrl).isNotEmpty
+                        ? Image.network(
+                            ApiClient.resolveUrl(service.imageUrl),
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => _buildPlaceholderImage(),
+                          )
+                        : _buildPlaceholderImage(),
+                  ),
+                  // Price Badge - Modern pill top-left
+                  Positioned(
+                    top: 10,
+                    left: 10,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0B1C30).withOpacity(0.85),
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      child: Text(
+                        '₹${NumberFormat('#,##,###').format(service.basePrice)}',
+                        style: GoogleFonts.inter(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Info Section
+            Container(
+              padding: const EdgeInsets.all(10),
+              color: Colors.white,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    service.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.outfit(
+                      color: const Color(0xFF0B1C30),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // Category name
+                      Expanded(
+                        child: Text(
+                          service.category.toUpperCase(),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.inter(
+                            color: const Color(0xFF006A61),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 9,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
+                      // Quick add circular plus icon
+                      Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFE8F5F3),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.add,
+                          size: 14,
+                          color: Color(0xFF006A61),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPlaceholderImage() {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFFE8F5F3), Color(0xFFEFF4FF)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: const Center(
+        child: Icon(
+          Icons.bubble_chart_rounded,
+          size: 32,
+          color: Color(0xFF006A61),
+        ),
+      ),
+    );
+  }
+}
+
+class _CategoryNode {
+  final Category category;
+  final List<_CategoryNode> children = [];
+  _CategoryNode(this.category);
+}
+
+class _FlattenedCategoryNode {
+  final Category category;
+  final int depth;
+  final bool hasChildren;
+  _FlattenedCategoryNode(this.category, this.depth, this.hasChildren);
 }
 
 class DashedDivider extends StatelessWidget {

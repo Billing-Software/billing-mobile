@@ -27,7 +27,7 @@ class StaffMember {
       contact: json['contact'] ?? '',
       role: json['role'] ?? 'Staff',
       totalBills: json['totalBills'] ?? 0,
-      revenueGen: (json['revenueGen'] as num?)?.toDouble() ?? 0.0,
+      revenueGen: (json['revenueGenerated'] as num?)?.toDouble() ?? (json['revenueGen'] as num?)?.toDouble() ?? 0.0,
       status: json['status'] ?? 'Active',
     );
   }

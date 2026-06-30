@@ -1,5 +1,1 @@
-package com.smartbill.pro.billing_mobile
-
-import io.flutter.embedding.android.FlutterActivity
-
-class MainActivity : FlutterActivity()
+// Obsolete package path - renamed to com.smartbill.pro.billcom

@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/bill.dart';
+import '../models/business.dart';
 import '../services/bluetooth_printer_service.dart';
+import '../services/business_service.dart';
 
 class BluetoothPrinterProvider extends ChangeNotifier {
   final BluetoothPrinterService _service = BluetoothPrinterService();
@@ -177,10 +179,17 @@ class BluetoothPrinterProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> printBill(Bill bill, {String businessName = 'SmartBill Pro'}) async {
+  Future<bool> printBill(Bill bill, {String businessName = 'BillCom', Business? business}) async {
     _errorMessage = null;
     try {
-      await _service.printReceipt(bill, businessName: businessName);
+      Business? activeBusiness = business;
+      try {
+        activeBusiness = await BusinessService().getProfile().timeout(const Duration(seconds: 2));
+      } catch (e) {
+        debugPrint('Failed to fetch fresh business profile for printing: $e');
+        // fall back to the passed parameter
+      }
+      await _service.printReceipt(bill, businessName: businessName, business: activeBusiness);
       return true;
     } catch (e) {
       _errorMessage = e.toString().replaceAll("Exception: ", "");
@@ -189,7 +198,7 @@ class BluetoothPrinterProvider extends ChangeNotifier {
     }
   }
 
-  String formatReceipt(Bill bill, {String businessName = 'SmartBill Pro'}) {
-    return _service.formatReceipt(bill, businessName: businessName);
+  String formatReceipt(Bill bill, {String businessName = 'BillCom', Business? business}) {
+    return _service.formatReceipt(bill, businessName: businessName, business: business);
   }
 }

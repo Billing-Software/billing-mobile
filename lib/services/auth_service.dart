@@ -6,11 +6,15 @@ import 'api_client.dart';
 class AuthService {
   final ApiClient _client = ApiClient();
 
-  Future<User> login(String username, String password) async {
-    final response = await _client.post('/auth/login', {
-      'username': username,
+  Future<User> login(String email, String password, {int? businessId}) async {
+    final Map<String, dynamic> body = {
+      'email': email,
       'password': password,
-    });
+    };
+    if (businessId != null) {
+      body['businessId'] = businessId;
+    }
+    final response = await _client.post('/auth/login', body);
     if (response.statusCode >= 200 && response.statusCode < 300) {
       final json = jsonDecode(response.body);
       final user = User.fromJson(json);
@@ -19,6 +23,36 @@ class AuthService {
       return user;
     } else {
       throw Exception(response.body.isNotEmpty ? response.body : 'Login failed');
+    }
+  }
+
+  Future<Map<String, dynamic>> forgotPassword(String email) async {
+    final response = await _client.post('/auth/forgot-password', {'email': email});
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception(response.body.isNotEmpty ? response.body : 'Failed to request password reset code.');
+    }
+  }
+
+  Future<void> resetPassword(String email, String token, String newPassword) async {
+    final response = await _client.post('/auth/reset-password', {
+      'email': email,
+      'token': token,
+      'newPassword': newPassword,
+    });
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception(response.body.isNotEmpty ? response.body : 'Failed to reset password.');
+    }
+  }
+
+  Future<void> changePassword(String currentPassword, String newPassword) async {
+    final response = await _client.post('/auth/change-password', {
+      'currentPassword': currentPassword,
+      'newPassword': newPassword,
+    });
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception(response.body.isNotEmpty ? response.body : 'Failed to change password.');
     }
   }
 

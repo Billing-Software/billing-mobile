@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../providers/auth_provider.dart';
 
 import '../widgets/custom_button.dart';
 import '../widgets/custom_text_field.dart';
+import '../widgets/custom_dropdown_field.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -19,6 +21,8 @@ class _LoginScreenState extends State<LoginScreen> {
   // Login Controllers
   final _loginUsernameController = TextEditingController();
   final _loginPasswordController = TextEditingController();
+  final _loginBusinessIdController = TextEditingController();
+  bool _isStaff = false;
 
   // Register Controllers - Step 1: Account Setup
   final _registerUsernameController = TextEditingController();
@@ -59,6 +63,7 @@ class _LoginScreenState extends State<LoginScreen> {
   void dispose() {
     _loginUsernameController.dispose();
     _loginPasswordController.dispose();
+    _loginBusinessIdController.dispose();
     _registerUsernameController.dispose();
     _registerEmailController.dispose();
     _registerPasswordController.dispose();
@@ -241,9 +246,15 @@ class _LoginScreenState extends State<LoginScreen> {
     } else {
       if (!_formKey.currentState!.validate()) return;
 
+      int? businessId;
+      if (_isStaff) {
+        businessId = int.tryParse(_loginBusinessIdController.text.trim());
+      }
+
       bool success = await authProvider.login(
         _loginUsernameController.text.trim(),
         _loginPasswordController.text,
+        businessId: businessId,
       );
 
       if (success) {
@@ -268,6 +279,189 @@ class _LoginScreenState extends State<LoginScreen> {
         }
       }
     }
+  }
+
+  void _showForgotPasswordDialog() {
+    final emailController = TextEditingController(text: _loginUsernameController.text);
+    final codeController = TextEditingController();
+    final newPasswordController = TextEditingController();
+    bool codeSent = false;
+    String? tempCode;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(20),
+          topRight: Radius.circular(20),
+        ),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setSheetState) => Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(ctx).viewInsets.bottom,
+          ),
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      codeSent ? 'Reset Password' : 'Forgot Password',
+                      style: GoogleFonts.outfit(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 18,
+                        color: const Color(0xFF0B1C30),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                if (!codeSent) ...[
+                  Text(
+                    'Enter your registered email address to receive a 6-digit verification code.',
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      color: const Color(0xFF7C839B),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  CustomTextField(
+                    controller: emailController,
+                    label: 'Email Address',
+                    placeholder: 'john@example.com',
+                    prefixIcon: Icons.email_outlined,
+                    keyboardType: TextInputType.emailAddress,
+                  ),
+                  const SizedBox(height: 20),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF006A61),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: () async {
+                      final email = emailController.text.trim();
+                      if (email.isEmpty || !email.contains('@')) {
+                        ScaffoldMessenger.of(ctx).showSnackBar(
+                          const SnackBar(content: Text('Please enter a valid email address')),
+                        );
+                        return;
+                      }
+                      try {
+                        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+                        final res = await authProvider.forgotPassword(email);
+                        setSheetState(() {
+                          codeSent = true;
+                          tempCode = res['code']?.toString();
+                        });
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Reset code sent! (For testing: $tempCode)')),
+                          );
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Error requesting reset code: $e')),
+                          );
+                        }
+                      }
+                    },
+                    child: Text(
+                      'Send Reset Code',
+                      style: GoogleFonts.inter(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ] else ...[
+                  Text(
+                    'Enter the 6-digit code sent to your email and your new password.',
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      color: const Color(0xFF7C839B),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  CustomTextField(
+                    controller: emailController,
+                    label: 'Email Address',
+                    placeholder: 'john@example.com',
+                    prefixIcon: Icons.email_outlined,
+                    readOnly: true,
+                  ),
+                  const SizedBox(height: 12),
+                  CustomTextField(
+                    controller: codeController,
+                    label: '6-Digit Code',
+                    placeholder: 'Enter verification code',
+                    prefixIcon: Icons.pin_outlined,
+                  ),
+                  const SizedBox(height: 12),
+                  CustomTextField(
+                    controller: newPasswordController,
+                    label: 'New Password',
+                    placeholder: 'Enter new password (min 6 chars)',
+                    prefixIcon: Icons.lock_outline,
+                    obscureText: true,
+                  ),
+                  const SizedBox(height: 20),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF006A61),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: () async {
+                      final email = emailController.text.trim();
+                      final code = codeController.text.trim();
+                      final newPass = newPasswordController.text;
+                      if (code.isEmpty || newPass.length < 6) {
+                        ScaffoldMessenger.of(ctx).showSnackBar(
+                          const SnackBar(content: Text('Invalid code or password length')),
+                        );
+                        return;
+                      }
+                      try {
+                        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+                        await authProvider.resetPassword(email, code, newPass);
+                        if (context.mounted) {
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Password reset successfully! Log in now.')),
+                          );
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Error resetting password: $e')),
+                          );
+                        }
+                      }
+                    },
+                    child: Text(
+                      'Reset Password',
+                      style: GoogleFonts.inter(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildStepIndicator() {
@@ -575,46 +769,22 @@ class _LoginScreenState extends State<LoginScreen> {
           onFieldSubmitted: (_) => _submit(),
         ),
         const SizedBox(height: 16),
-        Text(
-          'DEFAULT TAX CONTRIBUTION',
-          style: GoogleFonts.inter(
-            color: const Color(0xFF7C839B),
-            fontSize: 10,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1.2,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: const Color(0xFFC6C6CD)),
-          ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<double>(
-              value: _registerDefaultTaxRate,
-              isExpanded: true,
-              style: GoogleFonts.inter(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: const Color(0xFF0B1C30),
-              ),
-              items: const [
-                DropdownMenuItem(value: 18.0, child: Text('18.0% Standard GST Rule')),
-                DropdownMenuItem(value: 5.0, child: Text('5.0% Beauty & Food Services')),
-                DropdownMenuItem(value: 0.0, child: Text('0.0% Tax Exempt Rule')),
-              ],
-              onChanged: (val) {
-                if (val != null) {
-                  setState(() {
-                    _registerDefaultTaxRate = val;
-                  });
-                }
-              },
-            ),
-          ),
+        CustomDropdownField<double>(
+          label: 'Default Tax Contribution',
+          value: _registerDefaultTaxRate,
+          items: const [18.0, 5.0, 0.0],
+          itemLabel: (val) {
+            if (val == 18.0) return '18.0% Standard GST Rule';
+            if (val == 5.0) return '5.0% Beauty & Food Services';
+            return '0.0% Tax Exempt Rule';
+          },
+          onChanged: (val) {
+            if (val != null) {
+              setState(() {
+                _registerDefaultTaxRate = val;
+              });
+            }
+          },
         ),
         const SizedBox(height: 12),
         CheckboxListTile(
@@ -662,30 +832,21 @@ class _LoginScreenState extends State<LoginScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // App Branding
-                      const Icon(
-                        Icons.payments_outlined,
-                        size: 60,
-                        color: Color(0xFF006A61),
+                      // App Branding (Full Logo)
+                      SvgPicture.asset(
+                        'assets/BillCom-full.svg',
+                        height: 90,
+                        fit: BoxFit.contain,
                       ),
-                      const SizedBox(height: 10),
-                      Text(
-                        'SmartBill Pro',
-                        textAlign: TextAlign.center,
-                        style: GoogleFonts.outfit(
-                          fontSize: 26,
-                          fontWeight: FontWeight.w900,
-                          color: const Color(0xFF0B1C30),
-                          letterSpacing: -0.5,
-                        ),
-                      ),
+                      const SizedBox(height: 8),
                       Text(
                         'Point-of-Sale Mobile Terminal',
                         textAlign: TextAlign.center,
                         style: GoogleFonts.inter(
-                          fontSize: 13,
+                          fontSize: 11,
                           color: const Color(0xFF7C839B),
                           fontWeight: FontWeight.w600,
+                          letterSpacing: 0.5,
                         ),
                       ),
                       const SizedBox(height: 24),
@@ -755,18 +916,97 @@ class _LoginScreenState extends State<LoginScreen> {
   
                       // Form Fields
                       if (!_isRegisterMode) ...[
+                        Container(
+                          margin: const EdgeInsets.only(bottom: 20),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEFF4FF),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          padding: const EdgeInsets.all(4),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: InkWell(
+                                  onTap: () {
+                                    setState(() {
+                                      _isStaff = false;
+                                    });
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: !_isStaff ? const Color(0xFF006A61) : Colors.transparent,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      'Owner Account',
+                                      textAlign: TextAlign.center,
+                                      style: GoogleFonts.inter(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: !_isStaff ? Colors.white : const Color(0xFF45464D),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                child: InkWell(
+                                  onTap: () {
+                                    setState(() {
+                                      _isStaff = true;
+                                    });
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: _isStaff ? const Color(0xFF006A61) : Colors.transparent,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      'Staff Account',
+                                      textAlign: TextAlign.center,
+                                      style: GoogleFonts.inter(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: _isStaff ? Colors.white : const Color(0xFF45464D),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (_isStaff) ...[
+                          CustomTextField(
+                            controller: _loginBusinessIdController,
+                            label: 'Business ID',
+                            placeholder: 'Enter 4-digit Business ID',
+                            prefixIcon: Icons.business,
+                            keyboardType: TextInputType.number,
+                            textInputAction: TextInputAction.next,
+                            validator: (value) {
+                              if (_isStaff && (value == null || value.trim().isEmpty)) {
+                                return 'Business ID is required';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                        ],
                         CustomTextField(
                           controller: _loginUsernameController,
-                          label: 'Username',
-                          placeholder: 'Enter username',
-                          prefixIcon: Icons.person_outline,
+                          label: 'Email Address',
+                          placeholder: _isStaff ? 'staff@billcom.com' : 'john@example.com',
+                          prefixIcon: Icons.email_outlined,
                           textInputAction: TextInputAction.next,
-                          autofillHints: const [AutofillHints.username],
+                          autofillHints: const [AutofillHints.email],
                           autocorrect: false,
                           enableSuggestions: false,
                           validator: (value) {
-                            if (value == null || value.trim().isEmpty) {
-                              return 'Username is required';
+                            if (value == null || value.trim().isEmpty || !value.contains('@')) {
+                              return 'Please enter a valid email address';
                             }
                             return null;
                           },
@@ -790,7 +1030,23 @@ class _LoginScreenState extends State<LoginScreen> {
                             return null;
                           },
                         ),
-                        const SizedBox(height: 24),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton(
+                            onPressed: () {
+                              _showForgotPasswordDialog();
+                            },
+                            child: Text(
+                              'Forgot Password?',
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: const Color(0xFF006A61),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
                         CustomButton(
                           text: 'Access Account',
                           isLoading: authProvider.isLoading,
